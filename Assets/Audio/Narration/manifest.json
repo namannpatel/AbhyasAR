@@ -1,0 +1,32 @@
+{
+ "speaker": "shubh",
+ "language_code": "en-IN",
+ "model": "bulbul:v3",
+ "lines": [
+  {"id": "scenario_trashcan", "text": "A fire just started in a trash can! What should you do?", "file": "scenario_trashcan.wav"},
+  {"id": "scenario_outlet", "text": "A fire just started at an overloaded power outlet! What should you do?", "file": "scenario_outlet.wav"},
+  {"id": "scenario_cabinet", "text": "A fire just started in the electrical cabinet! What should you do?", "file": "scenario_cabinet.wav"},
+  {"id": "scenario_furnace", "text": "A fire just started at the gas furnace! What should you do?", "file": "scenario_furnace.wav"},
+  {"id": "prompt_place_fire", "text": "Tap the floor to start the fire.", "file": "prompt_place_fire.wav"},
+  {"id": "prompt_place_wall_content", "text": "Tap a wall to mount the alarm and extinguishers.", "file": "prompt_place_wall_content.wav"},
+  {"id": "prompt_scan_wall", "text": "Move your phone slowly to scan the wall.", "file": "prompt_scan_wall.wav"},
+  {"id": "prompt_scan_floor", "text": "Move your phone slowly to scan the floor.", "file": "prompt_scan_floor.wav"},
+  {"id": "prompt_activate_alarm", "text": "Find and tap the manual call point to raise the alarm.", "file": "prompt_activate_alarm.wav"},
+  {"id": "prompt_scanning_floor", "text": "Scanning the room for a floor.", "file": "prompt_scanning_floor.wav"},
+  {"id": "prompt_mount_extinguishers", "text": "Tap a wall to mount the extinguishers.", "file": "prompt_mount_extinguishers.wav"},
+  {"id": "guide_class_a", "text": "Class A fire, ordinary combustibles. Use the grey extinguisher.", "file": "guide_class_a.wav"},
+  {"id": "guide_class_bc", "text": "Class B or C fire, liquid or electrical. Use the yellow extinguisher. Never the grey one, it's not safe here.", "file": "guide_class_bc.wav"},
+  {"id": "guide_class_abc", "text": "Multi-class fire. The red, A B C rated extinguisher is safest.", "file": "guide_class_abc.wav"},
+  {"id": "guide_default", "text": "Choose the correct extinguisher for this fire.", "file": "guide_default.wav"},
+  {"id": "pass_pull_pin", "text": "Pull the pin.", "file": "pass_pull_pin.wav"},
+  {"id": "pass_aim_base", "text": "Aim at the base of the fire.", "file": "pass_aim_base.wav"},
+  {"id": "pass_squeeze", "text": "Press and hold the handle to spray.", "file": "pass_squeeze.wav"},
+  {"id": "pass_sweep", "text": "Sweep side to side while spraying.", "file": "pass_sweep.wav"},
+  {"id": "pass_keep_spraying", "text": "Keep spraying until the fire is out.", "file": "pass_keep_spraying.wav"},
+  {"id": "pass_fire_out", "text": "Fire out. Nice work!", "file": "pass_fire_out.wav"},
+  {"id": "warning_wrong_extinguisher", "text": "Wrong extinguisher. This won't put out this fire!", "file": "warning_wrong_extinguisher.wav"},
+  {"id": "result_great_job", "text": "Great job!", "file": "result_great_job.wav"},
+  {"id": "result_not_quite", "text": "Not quite. Try again.", "file": "result_not_quite.wav"},
+  {"id": "result_furnace_exploded", "text": "The furnace exploded!", "file": "result_furnace_exploded.wav"}
+ ]
+}

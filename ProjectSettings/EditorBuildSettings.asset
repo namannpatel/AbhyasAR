@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Scenes/MainMenu.unity
+    guid: 4ede87ee20620b64aa614b8c7f937e91
+  - enabled: 1
+    path: Assets/Scenes/Tutorial.unity
+    guid: 65f1c13de95c9bb41b4e7150089da028
+  - enabled: 1
+    path: Assets/Scenes/Main.unity
+    guid: c514662521dd66b4da5ed489442ea64b
+  - enabled: 1
+    path: Assets/Scenes/FireTraining.unity
+    guid: cafd7d7156626ec4c9f5ae3ae97986ac
+  - enabled: 1
+    path: Assets/Scenes/ChemicalSafety.unity
+    guid: 02d6bfdcfb5449f4dbb41b848f8eb220
+  - enabled: 1
+    path: Assets/Scenes/CprTraining.unity
+    guid: 01e1d0efd5ab9514d972dc0063baeae1
+  m_configObjects:
+    Unity.XR.Oculus.Settings: {fileID: 11400000, guid: 5fe1aef2d78676348b80fe34b8b791bc,
+      type: 2}
+    UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: 041c72d7d67f75f4d8850af0c6471c57,
+      type: 2}
+    UnityEditor.XR.ARKit.ARKitSettings: {fileID: 11400000, guid: 59815f61a45448a4aa79436f749b7347,
+      type: 2}
+    com.unity.xr.management.loader_settings: {fileID: 11400000, guid: 73800e3f909b7ea4abfa4cde423136b3,
+      type: 2}
