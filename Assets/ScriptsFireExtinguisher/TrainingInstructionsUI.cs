@@ -15,7 +15,7 @@ using UnityEngine;
 /// every frame -- so a line is spoken once per state transition instead of restarting itself
 /// 60 times a second while the player is still working through that step. Because this text
 /// is recomputed fresh every frame from LocalizationManager, a language switch mid-attempt
-/// (see LanguageDropdown) takes effect within one frame with no extra wiring needed here.
+/// (see LanguageSelectModal) takes effect within one frame with no extra wiring needed here.
 /// </summary>
 public class TrainingInstructionsUI : MonoBehaviour
 {
@@ -30,6 +30,9 @@ public class TrainingInstructionsUI : MonoBehaviour
     [Tooltip("Prominent red banner shown for warningDuration on a wrong-extinguisher pickup, in addition to the corner instruction text -- a small text swap alone is easy to miss.")]
     [SerializeField] private GameObject warningBanner;
 
+    [Tooltip("The banner's own caption text -- kept in sync with whichever warning is currently active (see ShowTimedWarning) instead of a static LocalizedText, since this one banner is now reused for more than one warning message.")]
+    [SerializeField] private TMP_Text warningBannerText;
+
     [Tooltip("Shared AR toolbar chrome (see ArHudToolbar) — optional, wires this module's timer and reposition action into it if present.")]
     [SerializeField] private ArHudToolbar toolbar;
 
@@ -38,6 +41,7 @@ public class TrainingInstructionsUI : MonoBehaviour
     private FireSafetyLessonController subscribedLesson;
     private NarrationPlayer narrationPlayer;
     private float warningUntilTime;
+    private string warningLocalizationKey;
     private string lastNarrationId;
 
     private void OnEnable()
@@ -50,6 +54,7 @@ public class TrainingInstructionsUI : MonoBehaviour
         if (coordinator != null)
         {
             coordinator.OnWrongExtinguisherWarning.AddListener(HandleWrongExtinguisherWarning);
+            coordinator.OnPickupBlockedAlarmNotActive.AddListener(HandleAlarmNotActiveWarning);
         }
 
         if (toolbar != null)
@@ -69,6 +74,7 @@ public class TrainingInstructionsUI : MonoBehaviour
         if (coordinator != null)
         {
             coordinator.OnWrongExtinguisherWarning.RemoveListener(HandleWrongExtinguisherWarning);
+            coordinator.OnPickupBlockedAlarmNotActive.RemoveListener(HandleAlarmNotActiveWarning);
         }
 
         if (subscribedLesson != null)
@@ -80,11 +86,31 @@ public class TrainingInstructionsUI : MonoBehaviour
 
     private void HandleWrongExtinguisherWarning()
     {
+        ShowTimedWarning("wrong_extinguisher_warning_line", "warning_wrong_extinguisher");
+    }
+
+    private void HandleAlarmNotActiveWarning()
+    {
+        ShowTimedWarning("alarm_not_activated_warning_line", "warning_alarm_not_activated");
+    }
+
+    /// <summary>
+    /// Overrides the normal instruction line with a prominent, timed warning banner --
+    /// shared by every blocked-action case (wrong extinguisher, alarm not yet activated)
+    /// so they all reuse the one existing banner/timer mechanism instead of each needing
+    /// their own. One-shot, event-driven -- played here rather than through the per-frame
+    /// state-change tracking in Update(), since a warning overrides the normal instruction
+    /// for a fixed duration rather than being a state of its own.
+    /// </summary>
+    private void ShowTimedWarning(string localizationKey, string narrationId)
+    {
         warningUntilTime = Time.time + warningDuration;
-        // One-shot, event-driven -- played here rather than through the per-frame
-        // state-change tracking below, since the warning overrides the normal instruction
-        // line for a fixed duration rather than being a state of its own.
-        narrationPlayer?.Play("warning_wrong_extinguisher"); // matches Assets/Audio/Narration/warning_wrong_extinguisher.wav
+        warningLocalizationKey = localizationKey;
+        if (warningBannerText != null)
+        {
+            warningBannerText.text = LocalizationManager.Get(localizationKey);
+        }
+        narrationPlayer?.Play(narrationId);
     }
 
     private void HandleExhibitViewed(string title, string content)
@@ -126,7 +152,7 @@ public class TrainingInstructionsUI : MonoBehaviour
 
         if (warningActive)
         {
-            label.text = LocalizationManager.Get("wrong_extinguisher_warning_line");
+            label.text = LocalizationManager.Get(warningLocalizationKey);
             return;
         }
 
@@ -165,7 +191,7 @@ public class TrainingInstructionsUI : MonoBehaviour
         {
             if (placementController.IsScanningForSurface)
             {
-                narrationId = placementController.CurrentStageSurfaceName == "wall" ? "prompt_scan_wall" : "prompt_scan_floor";
+                narrationId = "prompt_scan_floor";
                 return LocalizationManager.Get("step_format", placementController.CurrentStageNumber, placementController.TotalStages, LocalizationManager.Get(narrationId));
             }
             narrationId = placementPromptKey; // CurrentPlacementPrompt already returns a stable key (see its own doc comment).

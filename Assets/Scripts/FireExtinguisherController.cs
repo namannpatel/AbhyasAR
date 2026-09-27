@@ -24,8 +24,8 @@ public class FireExtinguisherController : MonoBehaviour
     private ParticleSystem part;
     private ExtinguisherIdentity identity;
     private List<ParticleCollisionEvent> collisionEvents;
-    private float extinguishRate = 0.35f;
-    private float emissionRate = 0.28f;
+    private float extinguishRate = 0.44f;
+    private float emissionRate = 0.35f;
 
     // Fires we've already flagged as a safety violation this contact, so we don't spam the event every frame.
     private readonly HashSet<FireSource> flaggedViolations = new HashSet<FireSource>();

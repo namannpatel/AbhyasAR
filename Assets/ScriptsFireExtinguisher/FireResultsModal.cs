@@ -17,9 +17,22 @@ public class FireResultsModal : MonoBehaviour
 {
     [SerializeField] private FireResponseCoordinator coordinator;
     [SerializeField] private GameObject modalRoot;
+
+    [Tooltip("Full-screen dim behind the modal card. Toggled together with modalRoot so it never outlives the modal.")]
+    [SerializeField] private GameObject backdrop;
+
     [SerializeField] private TMP_Text headerText;
     [SerializeField] private TMP_Text missedStepsText;
     [SerializeField] private Button continueButton;
+
+    /// <summary>
+    /// Raised when the player dismisses this modal. TrainingResultsUI listens for this to
+    /// defer revealing its own (larger) checklist panel until this modal is out of the way --
+    /// without that, both panels used to go active on the same OnModuleComplete event and,
+    /// being different sizes but both screen-centered, the taller panel peeked out from behind
+    /// the shorter modal on every result.
+    /// </summary>
+    public event System.Action OnDismissed;
 
     private NarrationPlayer narrationPlayer;
 
@@ -80,6 +93,10 @@ public class FireResultsModal : MonoBehaviour
         {
             modalRoot.SetActive(true);
         }
+        if (backdrop != null)
+        {
+            backdrop.SetActive(true);
+        }
 
         if (headerText != null)
         {
@@ -114,7 +131,7 @@ public class FireResultsModal : MonoBehaviour
             // Not tracked as its own pass/fail flag on FireResponseResult (only whether the
             // attempt got force-failed for missing it) -- so, unlike every other line below,
             // this one can only ever appear as a miss, never a confirmed checkmark.
-            sb.AppendLine("✗ " + LocalizationManager.Get("check_gas_shutoff"));
+            sb.AppendLine("<color=#C62828>✗</color> " + LocalizationManager.Get("check_gas_shutoff"));
         }
 
         AppendCheck(sb, result.alarmActivated, LocalizationManager.Get("check_alarm"));
@@ -130,7 +147,7 @@ public class FireResultsModal : MonoBehaviour
 
     private static void AppendCheck(StringBuilder sb, bool ok, string label)
     {
-        sb.AppendLine((ok ? "✓ " : "✗ ") + label);
+        sb.AppendLine((ok ? "<color=#2E7D32>✓</color> " : "<color=#C62828>✗</color> ") + label);
     }
 
     private void Dismiss()
@@ -139,5 +156,10 @@ public class FireResultsModal : MonoBehaviour
         {
             modalRoot.SetActive(false);
         }
+        if (backdrop != null)
+        {
+            backdrop.SetActive(false);
+        }
+        OnDismissed?.Invoke();
     }
 }

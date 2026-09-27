@@ -5,15 +5,11 @@ using UnityEngine.XR.ARSubsystems;
 
 /// <summary>
 /// Placement for the training scenario: a single-owner, tap-driven stage sequence. Only
-/// one stage is ever "listening" for a tap at a time, and each stage names the surface
-/// type it needs (floor vs. wall) — a tap on the wrong surface type is ignored rather
-/// than misinterpreted as a different stage's placement.
-///
-/// Stage order: tap a wall to mount the alarm and the extinguisher choices together, then
-/// tap the floor to place the fire. Both floor and wall planes are scanned (with the blue
-/// plane overlay visible the whole time — see ARPlaneVisualizer.mat), so the "keep
-/// scanning" message only asks for whichever surface the *current* stage still needs, not
-/// both up front.
+/// one stage is ever "listening" for a tap at a time. Every stage places on the floor —
+/// the fire safety wall (a self-contained prefab: concrete-wall backdrop + manual call
+/// point + the full set of extinguisher choices, all pre-mounted) is placed with a floor
+/// tap too, the same as the fire itself, rather than requiring the player to find and tap
+/// a real vertical wall.
 ///
 /// Every placed object is attached to a real ARAnchor (see CreateAnchor) rather than a
 /// bare Transform, so it stays put relative to the room as the device's own tracking
@@ -28,20 +24,11 @@ public class ARPlacementController : MonoBehaviour
     [Tooltip("AR-native 'Learn' stage content (auto-playing exhibits — must include a FireSafetyLessonController). Placed on the floor at the first tap. Leave empty to skip.")]
     [SerializeField] private GameObject fireSafetyLessonPrefab;
 
-    [Tooltip("Activate-stage content: a single manual call point (must include a ManualCallPointController). Placed on the wall, together with the extinguisher choices, at the next wall tap. Leave empty to skip.")]
-    [SerializeField] private GameObject manualCallPointPrefab;
+    [Tooltip("Activate + Assist content, all in one self-contained prefab: a concrete wall backdrop with a manual call point and the full set of extinguisher choices already mounted on it (must include a ManualCallPointController and one or more ExtinguisherPickup descendants). Placed on the floor with a single tap. Leave empty to skip.")]
+    [SerializeField] private GameObject fireSafetyWallPrefab;
 
     [Tooltip("The scenario options placed on the floor at the next floor tap (each must include FireSource, and may include its own ignition-cause dressing) — one is picked at random per attempt so the module isn't locked to a single scenario.")]
     [SerializeField] private GameObject[] firePrefabOptions;
-
-    [Tooltip("The extinguisher choices placed on the wall, alongside the alarm, at the same tap (mix of correct and incorrect for variety — each must include ExtinguisherPickup + PassChecklistTracker).")]
-    [SerializeField] private GameObject[] extinguisherOptionPrefabs;
-
-    [Tooltip("Distance (meters) between adjacent extinguisher options along the wall.")]
-    [SerializeField] private float extinguisherSpacing = 0.5f;
-
-    [Tooltip("Vertical offset (meters) of the alarm button below the tapped wall point / extinguisher row, so it doesn't overlap the extinguishers mounted at the tap itself.")]
-    [SerializeField] private float callPointVerticalOffset = -0.5f;
 
     [Tooltip("Plane manager scanned for taps and whose visualizers get hidden once every stage is placed.")]
     [SerializeField] private ARPlaneManager planeManager;
@@ -60,21 +47,21 @@ public class ARPlacementController : MonoBehaviour
 
     // Sequential campaign: every scenario in firePrefabOptions gets trained exactly once,
     // in a shuffled order fixed for the whole session -- not a fresh random pick each
-    // attempt. The wall/floor taps from the first placement are remembered so each later
-    // scenario auto-places without asking the player to re-tap the room.
+    // attempt. The floor tap from the first placement is remembered so each later
+    // scenario auto-places without asking the player to re-tap the room. The fire safety
+    // wall (call point + extinguishers) is placed once for the whole session and never
+    // re-placed between scenarios -- see AdvanceToNextScenario.
     private GameObject[] scenarioOrder;
     private int scenarioIndex;
     private Pose lastFloorPose;
     private ARPlane lastFloorPlane;
-    private Pose lastWallPose;
-    private ARPlane lastWallPlane;
 
     public IReadOnlyList<GameObject> PlacedExtinguisherOptions => placedExtinguisherOptions;
     public GameObject ChosenExtinguisher { get; private set; }
     public GameObject PlacedFire { get; private set; }
     public GameObject PlacedLesson { get; private set; }
     public FireSafetyLessonController LessonController { get; private set; }
-    public GameObject PlacedCallPoint { get; private set; }
+    public GameObject PlacedFireSafetyWall { get; private set; }
     public ManualCallPointController CallPointController { get; private set; }
 
     /// <summary>1-based index of the stage currently awaiting a tap or in progress, for a "Step X/Y" HUD.</summary>
@@ -94,28 +81,12 @@ public class ARPlacementController : MonoBehaviour
 
     private Stage CurrentStage => activeStages != null && stageIndex < activeStages.Count ? activeStages[stageIndex] : Stage.Done;
 
-    /// <summary>"wall" or "floor" — the surface type the current stage's tap needs, for scanning-feedback wording.</summary>
-    public string CurrentStageSurfaceName => CurrentStage == Stage.WallContent ? "wall" : "floor";
-
-    /// <summary>
-    /// True for any plane that isn't clearly a floor/ceiling -- deliberately more permissive
-    /// than requiring PlaneAlignment.Vertical exactly. In the field, ARCore/ARKit frequently
-    /// classify a real, roughly-vertical wall as NotAxisAligned rather than strictly Vertical
-    /// (tracking noise, a wall that isn't perfectly plumb, or just early in detection) --
-    /// requiring an exact Vertical match silently rejected those real walls, which is why
-    /// floor detection worked reliably (floors consistently classify as HorizontalUp) while
-    /// wall detection did not.
-    /// </summary>
-    private static bool IsWallPlane(ARPlane plane)
-    {
-        return plane.alignment != PlaneAlignment.HorizontalUp && plane.alignment != PlaneAlignment.HorizontalDown;
-    }
-
     /// <summary>
     /// True when the current stage still needs a tap but ARCore/ARKit hasn't found a
-    /// plane of the required type (wall vs. floor) yet — drives a "keep scanning" message
-    /// instead of a bare tap prompt that looks stuck with no feedback while the player is
-    /// still moving the phone around the room.
+    /// horizontal-up (floor) plane yet — drives a "keep scanning" message instead of a bare
+    /// tap prompt that looks stuck with no feedback while the player is still moving the
+    /// phone around the room. Every stage places on the floor, so this is a plain floor
+    /// check -- no per-stage surface-type branching needed.
     /// </summary>
     public bool IsScanningForSurface
     {
@@ -126,13 +97,11 @@ public class ARPlacementController : MonoBehaviour
                 return false;
             }
 
-            bool needsWall = CurrentStage == Stage.WallContent;
             foreach (var plane in planeManager.trackables)
             {
-                bool matchesNeed = needsWall ? IsWallPlane(plane) : plane.alignment == PlaneAlignment.HorizontalUp;
-                if (matchesNeed)
+                if (plane.alignment == PlaneAlignment.HorizontalUp)
                 {
-                    return false; // at least one plane of the needed type already exists
+                    return false; // at least one floor plane already exists
                 }
             }
             return true;
@@ -175,12 +144,18 @@ public class ARPlacementController : MonoBehaviour
     {
         activeStages = new List<Stage>();
         if (fireSafetyLessonPrefab != null) activeStages.Add(Stage.Lesson);
-        // Fire goes down before the wall content (alarm + extinguishers) so the "sound the
-        // alarm"/"mount the extinguishers" prompt never appears while there's no fire yet
-        // to respond to -- the opening alert modal (see PlaceFireAt) is also what frames
-        // the scenario, so it needs to fire first too.
+        // The fire safety station (wall + alarm + extinguishers) goes down first, exactly
+        // as it would already exist in a real room before anything catches fire -- then the
+        // fire itself starts on a separate, later floor tap. Placing the fire first (an
+        // earlier version of this flow) meant the player had no visual reference for where
+        // the fire already was while tapping to place the (much larger) wall panel, so the
+        // wall could easily land on top of it and visually swallow it. Placing the wall
+        // first also means WallContent's own advance condition only needs "is it placed" --
+        // requiring the alarm to be activated before the fire even exists would be
+        // backwards; the real "sound the alarm before touching an extinguisher" gate is
+        // already enforced independently in ExtinguisherPickup.
+        if (fireSafetyWallPrefab != null) activeStages.Add(Stage.WallContent);
         activeStages.Add(Stage.Fire);
-        if (manualCallPointPrefab != null) activeStages.Add(Stage.WallContent);
         activeStages.Add(Stage.Extinguisher);
         stageIndex = 0;
     }
@@ -198,7 +173,7 @@ public class ARPlacementController : MonoBehaviour
         switch (CurrentStage)
         {
             case Stage.Lesson: return PlacedLesson == null ? "prompt_lesson" : null;
-            case Stage.WallContent: return PlacedCallPoint == null ? "prompt_place_wall_content" : null;
+            case Stage.WallContent: return PlacedFireSafetyWall == null ? "prompt_place_wall_content" : null;
             case Stage.Fire: return PlacedFire == null ? "prompt_place_fire" : null;
             default: return null;
         }
@@ -224,7 +199,7 @@ public class ARPlacementController : MonoBehaviour
         switch (CurrentStage)
         {
             case Stage.Lesson: return PlacedLesson != null;
-            case Stage.WallContent: return PlacedCallPoint != null;
+            case Stage.WallContent: return PlacedFireSafetyWall != null;
             case Stage.Fire: return PlacedFire != null;
             case Stage.Extinguisher: return placedExtinguisherOptions.Count > 0;
             default: return true;
@@ -250,7 +225,7 @@ public class ARPlacementController : MonoBehaviour
                 done = LessonController != null && LessonController.IsComplete;
                 break;
             case Stage.WallContent:
-                done = CallPointController != null && CallPointController.IsActivated;
+                done = PlacedFireSafetyWall != null;
                 break;
             case Stage.Fire:
                 done = PlacedFire != null;
@@ -294,12 +269,7 @@ public class ARPlacementController : MonoBehaviour
             return;
         }
 
-        bool needsWall = CurrentStage == Stage.WallContent;
-        if (needsWall && !IsWallPlane(plane))
-        {
-            return;
-        }
-        if (!needsWall && plane.alignment != PlaneAlignment.HorizontalUp)
+        if (plane.alignment != PlaneAlignment.HorizontalUp)
         {
             return;
         }
@@ -312,8 +282,7 @@ public class ARPlacementController : MonoBehaviour
                 PlaceLessonAt(hitPose, plane);
                 break;
             case Stage.WallContent:
-                PlaceCallPointAt(hitPose, plane);
-                PlaceExtinguisherOptions(hitPose, plane);
+                PlaceFireSafetyWallAt(hitPose, plane);
                 break;
             case Stage.Fire:
                 PlaceFireAt(hitPose, plane);
@@ -343,7 +312,7 @@ public class ARPlacementController : MonoBehaviour
     {
         if (fireSafetyLessonPrefab != null && PlacedLesson == null) return false;
         if (PlacedFire == null) return false;
-        if (manualCallPointPrefab != null && PlacedCallPoint == null) return false;
+        if (fireSafetyWallPrefab != null && PlacedFireSafetyWall == null) return false;
         return true;
     }
 
@@ -391,23 +360,76 @@ public class ARPlacementController : MonoBehaviour
         LessonController = PlacedLesson.GetComponentInChildren<FireSafetyLessonController>(true);
     }
 
-    private void PlaceCallPointAt(Pose pose, ARPlane wall)
+    /// <summary>
+    /// Places the whole fire safety wall — concrete-wall backdrop, manual call point, and
+    /// the full fixed set of extinguisher choices, all pre-mounted as children of one
+    /// prefab — with a single floor tap (same pattern as PlaceLessonAt/PlaceFireAt).
+    /// Replaces the old two-step "place the call point, then scatter extinguisher options
+    /// along the tapped wall" flow: since correctness is judged per-attempt by comparing
+    /// the fire's class against each extinguisher's own rating (not by which physical props
+    /// exist), one fixed wall design serves every scenario in the campaign.
+    /// </summary>
+    private void PlaceFireSafetyWallAt(Pose pose, ARPlane floor)
     {
-        // Remembered so AdvanceToNextScenario can re-place fresh extinguisher options here
-        // for each later scenario without asking the player to re-tap the wall.
-        lastWallPose = pose;
-        lastWallPlane = wall;
+        Transform anchor = CreateAnchor(pose, floor, "FireSafetyWallAnchor");
+        PlacedFireSafetyWall = Instantiate(fireSafetyWallPrefab, Vector3.zero, Quaternion.identity, anchor);
+        PlacedFireSafetyWall.transform.localPosition = Vector3.zero;
 
-        // Mounted below the extinguisher row (see PlaceExtinguisherOptions, which sits at
-        // the tap point itself) so the two don't overlap.
-        Vector3 position = pose.position + wall.transform.up * callPointVerticalOffset;
-        Quaternion rotation = Quaternion.LookRotation(wall.normal, Vector3.up);
-        Transform anchor = CreateAnchor(new Pose(position, rotation), wall, "CallPointAnchor");
-        PlacedCallPoint = Instantiate(manualCallPointPrefab, Vector3.zero, Quaternion.identity, anchor);
-        PlacedCallPoint.transform.localPosition = Vector3.zero;
-        PlacedCallPoint.transform.localRotation = Quaternion.identity;
-        CallPointController = PlacedCallPoint.GetComponentInChildren<ManualCallPointController>(true);
+        // Unlike a real wall (whose facing direction is defined by the physical wall's own
+        // plane), a floor tap's hit pose carries no meaningful "which way should this face"
+        // information -- its rotation just aligns up with the plane's normal, leaving the
+        // yaw around that axis arbitrary. Face the wall's front (+Z, where the call point and
+        // extinguishers are mounted) toward whoever just tapped the floor to place it, so it
+        // isn't a coin flip whether the player sees the front or the bare back of the wall.
+        Camera arCamera = Camera.main;
+        if (arCamera != null)
+        {
+            Vector3 towardCamera = arCamera.transform.position - PlacedFireSafetyWall.transform.position;
+            towardCamera.y = 0f;
+            if (towardCamera.sqrMagnitude > 0.0001f)
+            {
+                PlacedFireSafetyWall.transform.rotation = Quaternion.LookRotation(towardCamera.normalized, Vector3.up);
+            }
+            else
+            {
+                PlacedFireSafetyWall.transform.localRotation = Quaternion.identity;
+            }
+        }
+        else
+        {
+            PlacedFireSafetyWall.transform.localRotation = Quaternion.identity;
+        }
+
+        CallPointController = PlacedFireSafetyWall.GetComponentInChildren<ManualCallPointController>(true);
         coordinator?.ConfigureActivateStage(CallPointController);
+
+        FireSource fireSource = PlacedFire != null ? PlacedFire.GetComponent<FireSource>() : null;
+
+        foreach (var pickup in PlacedFireSafetyWall.GetComponentsInChildren<ExtinguisherPickup>(true))
+        {
+            // Must run after the localPosition/localRotation fix-up above -- see
+            // CaptureRestPose's own comment for why Awake()'s own snapshot can't be
+            // trusted as the "put it back here" pose for a rejected pickup.
+            pickup.CaptureRestPose();
+            pickup.SetRequiredCallPoint(CallPointController);
+
+            var tracker = pickup.GetComponent<PassChecklistTracker>();
+            if (fireSource != null)
+            {
+                pickup.SetTargetFire(fireSource);
+                if (tracker != null)
+                {
+                    tracker.SetTargetFire(fireSource);
+                }
+            }
+
+            GameObject instance = pickup.gameObject;
+            pickup.OnPickedUp.AddListener(() => HandleExtinguisherChosen(instance));
+            pickup.OnPickupBlockedAlarmNotActive.AddListener(() => coordinator?.OnPickupBlockedAlarmNotActive?.Invoke());
+            pickup.OnPickupBlockedWrongExtinguisher.AddListener(() => coordinator?.OnWrongExtinguisherWarning?.Invoke());
+
+            placedExtinguisherOptions.Add(instance);
+        }
     }
 
     /// <summary>
@@ -461,15 +483,30 @@ public class ARPlacementController : MonoBehaviour
         PlacedFire.transform.localPosition = Vector3.zero;
         PlacedFire.transform.localRotation = Quaternion.identity;
 
-        // The fire may not exist yet when the wall content (including the extinguishers)
-        // was placed — wire every already-placed extinguisher's target now that it does.
+        // The fire safety wall (including the extinguishers) is placed before the fire ever
+        // exists (see BuildActiveStages) — wire every already-placed extinguisher's target
+        // now that it does.
         var placedFireSource = PlacedFire.GetComponent<FireSource>();
-        foreach (var option in placedExtinguisherOptions)
+        if (placedFireSource != null)
         {
-            var tracker = option != null ? option.GetComponent<PassChecklistTracker>() : null;
-            if (tracker != null && placedFireSource != null)
+            foreach (var option in placedExtinguisherOptions)
             {
-                tracker.SetTargetFire(placedFireSource);
+                if (option == null)
+                {
+                    continue;
+                }
+
+                var pickup = option.GetComponent<ExtinguisherPickup>();
+                if (pickup != null)
+                {
+                    pickup.SetTargetFire(placedFireSource);
+                }
+
+                var tracker = option.GetComponent<PassChecklistTracker>();
+                if (tracker != null)
+                {
+                    tracker.SetTargetFire(placedFireSource);
+                }
             }
         }
 
@@ -483,86 +520,13 @@ public class ARPlacementController : MonoBehaviour
     }
 
     /// <summary>
-    /// Instantiates every entry in extinguisherOptionPrefabs along the tapped wall, in a
-    /// shuffled left-to-right order so the correct choice isn't always in the same slot.
-    /// The fire doesn't necessarily exist yet at this point (wall content is placed before
-    /// the floor tap that places it) — each option's target fire is wired here if it
-    /// already exists, and PlaceFireAt backfills it for any that placed first.
-    /// </summary>
-    private void PlaceExtinguisherOptions(Pose hitPose, ARPlane wall)
-    {
-        if (placedExtinguisherOptions.Count > 0 || extinguisherOptionPrefabs == null || extinguisherOptionPrefabs.Length == 0)
-        {
-            return;
-        }
-
-        Quaternion rotation = Quaternion.LookRotation(wall.normal, Vector3.up);
-
-        Vector3 tangent = Vector3.Cross(Vector3.up, wall.normal);
-        if (tangent.sqrMagnitude < 0.0001f)
-        {
-            tangent = wall.transform.up;
-        }
-        tangent.Normalize();
-
-        // Row sits at the tap point itself -- the alarm mounts below it (see PlaceCallPointAt).
-        Vector3 rowCenter = hitPose.position;
-
-        var shuffled = (GameObject[])extinguisherOptionPrefabs.Clone();
-        for (int i = shuffled.Length - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
-        }
-
-        FireSource fireSource = PlacedFire != null ? PlacedFire.GetComponent<FireSource>() : null;
-
-        float mid = (shuffled.Length - 1) / 2f;
-        for (int i = 0; i < shuffled.Length; i++)
-        {
-            if (shuffled[i] == null)
-            {
-                continue;
-            }
-
-            Vector3 position = rowCenter + tangent * ((i - mid) * extinguisherSpacing);
-            Transform anchor = CreateAnchor(new Pose(position, rotation), wall, $"ExtinguisherAnchor{i}");
-            GameObject instance = Instantiate(shuffled[i], Vector3.zero, Quaternion.identity, anchor);
-            instance.transform.localPosition = Vector3.zero;
-            instance.transform.localRotation = Quaternion.identity;
-            placedExtinguisherOptions.Add(instance);
-
-            var tracker = instance.GetComponent<PassChecklistTracker>();
-            if (tracker != null && fireSource != null)
-            {
-                tracker.SetTargetFire(fireSource);
-            }
-
-            var pickup = instance.GetComponent<ExtinguisherPickup>();
-            if (pickup != null)
-            {
-                // Must run after the localPosition/localRotation fix-up above -- see
-                // CaptureRestPose's own comment for why Awake()'s own snapshot can't be
-                // trusted as the "put it back here" pose for a rejected pickup.
-                pickup.CaptureRestPose();
-
-                GameObject capturedInstance = instance;
-                pickup.OnPickedUp.AddListener(() => HandleExtinguisherChosen(capturedInstance));
-            }
-        }
-    }
-
-    /// <summary>
-    /// Called once, the moment the player picks up an extinguisher option. If it isn't
-    /// rated for the current fire, the pickup is rejected outright — put back where it
-    /// was mounted, a warning shown, and every option (including this one) stays
-    /// available so the player can try a different one instead of being locked into a
-    /// losing attempt. Only a correctly-rated pickup actually commits: wires its tracker
-    /// into the module coordinator and disables pickup on the other options (no back-out/
-    /// reselect once genuinely committed). Also backfills SetTargetFire here in case the
-    /// fire still didn't exist when this option was placed and PlaceFireAt hadn't run yet
-    /// either (shouldn't happen in the normal wall-then-floor order, but keeps pickup
-    /// correctness checks reliable regardless of exactly when each stage was placed).
+    /// Called once, the moment the player picks up an extinguisher option — reached only
+    /// for a correctly-rated pickup now, since ExtinguisherPickup itself (see
+    /// SetRequiredCallPoint/SetTargetFire) rejects a wrong-class tap before OnPickedUp ever
+    /// fires. The CanExtinguish/UndoPickup check below is kept as a harmless defensive
+    /// fallback in case a pickup was ever left unwired, not something normal play should
+    /// reach. Wires the chosen option's tracker into the module coordinator and disables
+    /// pickup on the other options (no back-out/reselect once genuinely committed).
     /// </summary>
     private void HandleExtinguisherChosen(GameObject chosen)
     {
@@ -634,9 +598,23 @@ public class ARPlacementController : MonoBehaviour
     /// </summary>
     public void ResetTraining()
     {
+        // Every extinguisher is a fixed child of the one PlacedFireSafetyWall instance now
+        // (not individually anchored), so destroying that instance below cleans up every
+        // still-mounted extinguisher automatically. The one exception is a CURRENTLY HELD
+        // extinguisher: ExtinguisherPickup.PickUp reparents it to the AR camera, so at that
+        // point it's no longer a child of the wall at all and needs destroying directly --
+        // never via transform.parent, which would take the actual AR camera down with it.
         foreach (var option in placedExtinguisherOptions)
         {
-            DestroyPlacedExtinguisher(option);
+            if (option == null)
+            {
+                continue;
+            }
+            var pickup = option.GetComponent<ExtinguisherPickup>();
+            if (pickup != null && pickup.IsHeld)
+            {
+                Destroy(option);
+            }
         }
         placedExtinguisherOptions.Clear();
         ChosenExtinguisher = null;
@@ -654,10 +632,10 @@ public class ARPlacementController : MonoBehaviour
             LessonController = null;
         }
 
-        if (PlacedCallPoint != null)
+        if (PlacedFireSafetyWall != null)
         {
-            Destroy(PlacedCallPoint.transform.parent != null ? PlacedCallPoint.transform.parent.gameObject : PlacedCallPoint);
-            PlacedCallPoint = null;
+            Destroy(PlacedFireSafetyWall.transform.parent != null ? PlacedFireSafetyWall.transform.parent.gameObject : PlacedFireSafetyWall);
+            PlacedFireSafetyWall = null;
             CallPointController = null;
         }
 
@@ -667,10 +645,12 @@ public class ARPlacementController : MonoBehaviour
 
     /// <summary>
     /// Moves the campaign on to the next scenario in sequence, called by the results
-    /// screen's NEXT button. Clears the current fire and extinguisher choices (the alarm
-    /// stays mounted — it doesn't need re-activating for each scenario) and re-places
-    /// fresh ones at the same wall/floor spots already tapped, so training the next
-    /// scenario doesn't require scanning or tapping the room again.
+    /// screen's NEXT button. Replaces the fire, but the fire safety wall (call point +
+    /// extinguishers) stays mounted for the whole session rather than being destroyed and
+    /// re-placed — instead each extinguisher is reset in place (put back if held, and
+    /// re-enabled if it had been disabled by a prior commit), the new fire's class is
+    /// rewired onto all of them, and the alarm is re-armed so raising it is required again
+    /// each scenario, reinforcing the habit every round.
     /// </summary>
     public void AdvanceToNextScenario()
     {
@@ -683,10 +663,37 @@ public class ARPlacementController : MonoBehaviour
 
         foreach (var option in placedExtinguisherOptions)
         {
-            DestroyPlacedExtinguisher(option);
+            if (option == null)
+            {
+                continue;
+            }
+
+            var pickup = option.GetComponent<ExtinguisherPickup>();
+            if (pickup != null)
+            {
+                if (pickup.IsHeld)
+                {
+                    pickup.UndoPickup();
+                }
+                pickup.enabled = true;
+            }
+
+            var tracker = option.GetComponent<PassChecklistTracker>();
+            if (tracker != null)
+            {
+                tracker.ResetForNewAttempt();
+            }
         }
-        placedExtinguisherOptions.Clear();
         ChosenExtinguisher = null;
+
+        if (CallPointController != null)
+        {
+            CallPointController.ResetActivation();
+            // Also clears the coordinator's own ActivateStageDone flag, which
+            // ResetActivation (a call-point-only concern) doesn't touch -- without this
+            // it stays stuck true from the previous scenario forever.
+            coordinator?.ConfigureActivateStage(CallPointController);
+        }
 
         if (PlacedFire != null)
         {
@@ -694,44 +701,9 @@ public class ARPlacementController : MonoBehaviour
             PlacedFire = null;
         }
 
-        // Fire first (matches the campaign's normal stage order) so the extinguisher
-        // options below get PlacedFire's FireSource wired immediately instead of relying
-        // on PlaceFireAt's backfill for options placed before any fire existed.
         if (lastFloorPlane != null)
         {
             PlaceFireAt(lastFloorPose, lastFloorPlane);
-        }
-        if (lastWallPlane != null)
-        {
-            PlaceExtinguisherOptions(lastWallPose, lastWallPlane);
-        }
-    }
-
-    /// <summary>
-    /// Safely destroys a placed extinguisher option and the anchor it was mounted under.
-    /// Never destroys via option.transform.parent directly -- if the player had picked this
-    /// extinguisher up, ExtinguisherPickup.PickUp reparents it under the AR camera for the
-    /// held/aiming pose, so transform.parent at that point IS the scene camera, not an
-    /// anchor. Destroying that (as this used to, in Retry and AdvanceToNextScenario) took
-    /// the actual AR camera down with it -- breaking raycasting, rendering, and every UI
-    /// button on screen (see ExtinguisherPickup.HomeAnchor, which stays correct regardless
-    /// of hold state).
-    /// </summary>
-    private static void DestroyPlacedExtinguisher(GameObject option)
-    {
-        if (option == null)
-        {
-            return;
-        }
-
-        var pickup = option.GetComponent<ExtinguisherPickup>();
-        Transform homeAnchor = pickup != null ? pickup.HomeAnchor : option.transform.parent;
-
-        Destroy(option);
-
-        if (homeAnchor != null)
-        {
-            Destroy(homeAnchor.gameObject);
         }
     }
 

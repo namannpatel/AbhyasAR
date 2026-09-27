@@ -36,8 +36,11 @@ public class FireResponseCoordinator : MonoBehaviour
 
     public event Action<FireResponseResult> OnModuleComplete;
 
-    [Tooltip("Raised whenever the extinguisher tracker flags a wrong-extinguisher pickup — wire a HUD warning to this.")]
+    [Tooltip("Raised whenever the extinguisher tracker flags a wrong-extinguisher pickup, or a player attempts to pick up an extinguisher not rated for the current fire — wire a HUD warning to this.")]
     public UnityEvent OnWrongExtinguisherWarning;
+
+    [Tooltip("Raised whenever a player attempts to pick up an extinguisher before the alarm has been activated — wire a HUD warning to this.")]
+    public UnityEvent OnPickupBlockedAlarmNotActive;
 
     public bool ExtinguisherStageDone { get; private set; }
     public bool ActivateStageDone { get; private set; }

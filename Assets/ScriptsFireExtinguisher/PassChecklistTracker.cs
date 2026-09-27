@@ -158,6 +158,26 @@ public class PassChecklistTracker : MonoBehaviour
         CompleteAttempt();
     }
 
+    /// <summary>
+    /// Clears every PASS-step flag back to a fresh attempt -- called by
+    /// ARPlacementController.AdvanceToNextScenario when a scenario's extinguishers are
+    /// fixed wall mounts reused across the whole campaign rather than fresh instances.
+    /// Without this, attemptCompleted stays true from the previous scenario forever,
+    /// so CompleteAttempt's own guard silently swallows every later attempt's
+    /// OnAttemptComplete -- putting a later fire out never finishes the training.
+    /// </summary>
+    public void ResetForNewAttempt()
+    {
+        pinPulled = false;
+        aimedAtBase = false;
+        squeezed = false;
+        swept = false;
+        wrongExtinguisherUsed = false;
+        fireFullyOut = false;
+        attemptCompleted = false;
+        startTime = Time.time;
+    }
+
     private void CompleteAttempt()
     {
         if (attemptCompleted)

@@ -25,6 +25,16 @@ public class ManualCallPointController : MonoBehaviour
 
     public bool IsActivated { get; private set; }
 
+    /// <summary>Re-arms the alarm for the next scenario in a campaign (see ARPlacementController.AdvanceToNextScenario) -- the call point itself stays mounted between scenarios, so unlike a fresh placement's OnEnable reset, this has to be triggered explicitly. Also stops the looping siren from the previous scenario -- otherwise it just keeps blaring into the next attempt, which reads as "the alarm is already on" even though IsActivated has been reset.</summary>
+    public void ResetActivation()
+    {
+        IsActivated = false;
+        if (audioSource != null)
+        {
+            audioSource.Stop();
+        }
+    }
+
     private Collider callPointCollider;
     private AudioSource audioSource;
 

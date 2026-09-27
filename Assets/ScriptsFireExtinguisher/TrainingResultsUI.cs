@@ -16,6 +16,12 @@ public class TrainingResultsUI : MonoBehaviour
     [SerializeField] private FireResponseCoordinator coordinator;
     [SerializeField] private GameObject panelRoot;
 
+    [Tooltip("The terse GREAT JOB modal that fronts this panel. When set, this panel stays " +
+        "hidden (its content is still populated) until that modal is dismissed, so the two " +
+        "never show at once -- see FireResultsModal.OnDismissed. Leave unset to fall back to " +
+        "showing immediately, e.g. for a scene that doesn't use the modal.")]
+    [SerializeField] private FireResultsModal resultsModal;
+
     [SerializeField] private TMP_Text alarmLine;
     [SerializeField] private TMP_Text pullLine;
     [SerializeField] private TMP_Text aimLine;
@@ -39,6 +45,8 @@ public class TrainingResultsUI : MonoBehaviour
 
     private const string Pass = "✓";
     private const string Fail = "✗";
+    private static readonly Color PassColor = new Color32(0x2E, 0x7D, 0x32, 0xFF);
+    private static readonly Color FailColor = new Color32(0xC6, 0x28, 0x28, 0xFF);
 
     private void Awake()
     {
@@ -53,6 +61,10 @@ public class TrainingResultsUI : MonoBehaviour
         if (coordinator != null)
         {
             coordinator.OnModuleComplete += ShowResult;
+        }
+        if (resultsModal != null)
+        {
+            resultsModal.OnDismissed += RevealPanel;
         }
         retryButton?.onClick.AddListener(HandleRetry);
         backToMenuButton?.onClick.AddListener(HandleBackToMenu);
@@ -87,6 +99,10 @@ public class TrainingResultsUI : MonoBehaviour
         {
             coordinator.OnModuleComplete -= ShowResult;
         }
+        if (resultsModal != null)
+        {
+            resultsModal.OnDismissed -= RevealPanel;
+        }
         retryButton?.onClick.RemoveListener(HandleRetry);
         backToMenuButton?.onClick.RemoveListener(HandleBackToMenu);
         nextButton?.onClick.RemoveListener(HandleNext);
@@ -97,9 +113,11 @@ public class TrainingResultsUI : MonoBehaviour
     {
         lastResult = result;
 
-        if (panelRoot != null)
+        // Content is populated immediately either way; only the reveal is deferred when a
+        // fronting modal is wired up, so this panel never overlaps it (see resultsModal doc).
+        if (resultsModal == null)
         {
-            panelRoot.SetActive(true);
+            RevealPanel();
         }
 
         SetLine(alarmLine, LocalizationManager.Get("line_alarm"), result.alarmActivated);
@@ -121,6 +139,7 @@ public class TrainingResultsUI : MonoBehaviour
             overallResultText.text = result.passed
                 ? LocalizationManager.Get("overall_pass_format", result.elapsedSeconds.ToString("0.0"), result.score, scenarioTag)
                 : LocalizationManager.Get("overall_fail_format", result.score, scenarioTag);
+            overallResultText.color = result.passed ? PassColor : FailColor;
         }
 
         bool hasNext = placementController != null && placementController.HasNextScenario;
@@ -146,7 +165,21 @@ public class TrainingResultsUI : MonoBehaviour
         {
             return;
         }
-        label.text = $"{(ok ? Pass : Fail)} {text}";
+        string glyph = ok ? Pass : Fail;
+        string hex = ok ? "#2E7D32" : "#C62828";
+        label.text = $"<color={hex}>{glyph}</color> {text}";
+    }
+
+    /// <summary>
+    /// Activates panelRoot. Called either immediately from ShowResult (no fronting modal
+    /// wired up) or from resultsModal.OnDismissed once the player closes the GREAT JOB modal.
+    /// </summary>
+    private void RevealPanel()
+    {
+        if (panelRoot != null)
+        {
+            panelRoot.SetActive(true);
+        }
     }
 
     private void HandleRetry()

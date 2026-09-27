@@ -2,12 +2,13 @@ using UnityEngine;
 using UnityEngine.Events;
 
 /// <summary>
-/// Tap-to-pick-up for a wall-mounted extinguisher (see ARPlacementController, which
-/// mounts the extinguisher prefab on a tapped wall). Before pickup the extinguisher
-/// sits still where it was mounted; tapping its body (this object's Collider)
-/// re-parents it to the AR camera at a fixed held-position offset, like a
-/// first-person held prop — pointing the phone then naturally aims the nozzle,
-/// no separate aim input needed (see ExtinguisherAimController).
+/// Tap-to-pick-up for an extinguisher mounted on the fire safety wall scenario (see
+/// ARPlacementController, which places that whole prefab with one floor tap). Before
+/// pickup the extinguisher sits still where it was mounted; tapping its body (this
+/// object's Collider) re-parents it to the AR camera at a fixed held-position offset,
+/// like a first-person held prop — pointing the phone then naturally aims the nozzle,
+/// no separate aim input needed (see ExtinguisherAimController). A tap can be rejected
+/// outright before any of that happens -- see SetRequiredCallPoint/SetTargetFire.
 /// </summary>
 public class ExtinguisherPickup : MonoBehaviour
 {
@@ -17,7 +18,7 @@ public class ExtinguisherPickup : MonoBehaviour
     [Tooltip("Local position (relative to the camera) the extinguisher snaps to once held. Keep the handle (and the rest of the model) within the camera's FOV cone on a real device's narrower aspect ratio, not just in the Editor's Game View -- Unity's FOV is vertical, so a taller/narrower phone screen has a noticeably tighter horizontal FOV than a wider test window, and a held-prop offset that looks fine in the Editor can clip on-device. See the -- now corrected -- default here: the previous (0.12, -0.32, 0.55) put the handle's edge ~28 degrees off camera-forward against a real device's ~19-degree horizontal half-FOV budget, clipping it off-screen.")]
     [SerializeField] private Vector3 heldLocalPosition = new Vector3(0.05f, -0.22f, 0.85f);
 
-    [Tooltip("Local rotation (euler, relative to the camera) the extinguisher snaps to once held.")]
+    [Tooltip("Only used when nozzleReference is unset (see PickUp): local rotation (euler, relative to the camera) the extinguisher snaps to once held. When nozzleReference IS set, only the Y component is used, and it means something different -- see PickUp's doc comment: it spins the already-upright, already-aimed held pose around its own vertical axis (e.g. to bring the nozzle out from behind the body's silhouette) instead of an arbitrary roll.")]
     [SerializeField] private Vector3 heldLocalEulerAngles = new Vector3(0f, 0f, 0f);
 
     [Tooltip("The nozzle transform (see ExtinguisherAimController) — its rest-pose direction rarely points straight out of the model, so pickup auto-corrects rotation to make it point exactly where the camera looks once held. Optional.")]
@@ -25,6 +26,12 @@ public class ExtinguisherPickup : MonoBehaviour
 
     [Tooltip("Raised once, the moment the extinguisher is picked up.")]
     public UnityEvent OnPickedUp;
+
+    [Tooltip("Raised when a tap is rejected because the alarm hasn't been activated yet (see SetRequiredCallPoint) -- no pickup, no snap-into-hand.")]
+    public UnityEvent OnPickupBlockedAlarmNotActive;
+
+    [Tooltip("Raised when a tap is rejected because this extinguisher isn't rated for the current fire (see SetTargetFire) -- no pickup, no snap-into-hand.")]
+    public UnityEvent OnPickupBlockedWrongExtinguisher;
 
     [Tooltip("Sound played the instant the extinguisher is picked up.")]
     [SerializeField] private AudioClip pickupClip;
@@ -45,6 +52,9 @@ public class ExtinguisherPickup : MonoBehaviour
     private Transform originalParent;
     private Vector3 originalLocalPosition;
     private Quaternion originalLocalRotation;
+    private ManualCallPointController requiredCallPoint;
+    private FireSource targetFire;
+    private ExtinguisherIdentity identity;
 
     private void Awake()
     {
@@ -54,11 +64,28 @@ public class ExtinguisherPickup : MonoBehaviour
             Debug.LogWarning($"{name}: ExtinguisherPickup has no Collider, it can never be picked up.", this);
         }
 
+        // Always a descendant, never on this same GameObject (see FE_Red.prefab's
+        // hierarchy) -- resolved once here rather than requiring external wiring, since
+        // it never changes for a given prefab instance.
+        identity = GetComponentInChildren<ExtinguisherIdentity>();
+
         // Best-effort fallback only -- ARPlacementController calls CaptureRestPose() right
         // after it finishes positioning a freshly-placed extinguisher, which is what
         // actually matters (see CaptureRestPose's own comment for why Awake's snapshot
         // can't be trusted for this).
         CaptureRestPose();
+    }
+
+    /// <summary>Wired at runtime by ARPlacementController right after the wall scenario is placed -- until the alarm is activated, taps on this extinguisher are rejected outright (see Update()), not picked-up-then-undone.</summary>
+    public void SetRequiredCallPoint(ManualCallPointController callPoint)
+    {
+        requiredCallPoint = callPoint;
+    }
+
+    /// <summary>Wired at runtime once the current fire exists (mirrors PassChecklistTracker.SetTargetFire) -- lets Update() reject a wrong-class pickup before it ever happens, instead of ARPlacementController.HandleExtinguisherChosen undoing it after the fact.</summary>
+    public void SetTargetFire(FireSource fire)
+    {
+        targetFire = fire;
     }
 
     /// <summary>
@@ -98,6 +125,24 @@ public class ExtinguisherPickup : MonoBehaviour
             Ray ray = cam.ScreenPointToRay(screenPos);
             if (bodyCollider.Raycast(ray, out _, float.PositiveInfinity))
             {
+                // Both checks happen BEFORE PickUp -- rejecting here means the extinguisher
+                // never reparents/snaps into the player's hand at all, unlike the old
+                // pick-up-then-UndoPickup flow. requiredCallPoint/targetFire are null until
+                // ARPlacementController wires them right after placement, so an unwired
+                // pickup (e.g. a stray test instance) is never blocked by a gate it was never
+                // told to enforce.
+                if (requiredCallPoint != null && !requiredCallPoint.IsActivated)
+                {
+                    OnPickupBlockedAlarmNotActive?.Invoke();
+                    return;
+                }
+
+                if (identity != null && targetFire != null && !identity.CanExtinguish(targetFire.fireClass))
+                {
+                    OnPickupBlockedWrongExtinguisher?.Invoke();
+                    return;
+                }
+
                 PickUp(cam);
             }
         }
@@ -112,16 +157,37 @@ public class ExtinguisherPickup : MonoBehaviour
         }
         transform.SetParent(cam.transform, worldPositionStays: false);
         transform.localPosition = heldLocalPosition;
-        transform.localRotation = Quaternion.Euler(heldLocalEulerAngles);
 
         if (nozzleReference != null)
         {
-            // The nozzle's rest-pose forward direction comes from however the source
-            // model happened to be authored, not necessarily "straight out of the
-            // extinguisher" — correct for that here so pointing the phone at
-            // something always aims the nozzle at it, regardless of model quirks.
-            Quaternion correction = Quaternion.FromToRotation(nozzleReference.forward, cam.transform.forward);
-            transform.rotation = correction * transform.rotation;
+            // Aim the nozzle's forward exactly at the camera's forward (required for
+            // ExtinguisherAimController's aim-detection to line up with where the player is
+            // actually looking) while ALSO keeping the extinguisher's own long axis as close
+            // to upright (world up) as that aim constraint allows. The old approach
+            // (FromToRotation(nozzleReference.forward, cam.forward) applied on top of
+            // heldLocalEulerAngles) fixed the aim direction correctly but left roll around
+            // that axis essentially arbitrary -- in practice it could tip the whole canister
+            // onto its side to get the nozzle "out from behind" the body, which read as
+            // tilted far more than a person would ever actually hold one.
+            //
+            // nozzleReference is a direct child of this transform, so its localRotation
+            // (parent-independent) gives the nozzle's forward direction in THIS transform's
+            // own local space regardless of any rotation applied to this transform itself.
+            Vector3 nozzleLocalForward = nozzleReference.localRotation * Vector3.forward;
+            Quaternion zAxisToNozzle = Quaternion.FromToRotation(Vector3.forward, nozzleLocalForward);
+            Quaternion aimedAndLevel = Quaternion.LookRotation(cam.transform.forward, Vector3.up) * Quaternion.Inverse(zAxisToNozzle);
+
+            // heldLocalEulerAngles.y spins the already-level, already-aimed pose around its
+            // own (now-vertical) axis -- e.g. to rotate the nozzle out from directly behind
+            // the body's silhouette -- without re-introducing the old tilt. This does nudge
+            // the nozzle's true aim slightly off camera-forward, same as a real held
+            // extinguisher is never held in mathematically perfect alignment; keep it well
+            // inside ExtinguisherAimController's aimAngleThreshold.
+            transform.rotation = Quaternion.AngleAxis(heldLocalEulerAngles.y, Vector3.up) * aimedAndLevel;
+        }
+        else
+        {
+            transform.localRotation = Quaternion.Euler(heldLocalEulerAngles);
         }
 
         // This project has Physics.autoSyncTransforms disabled (Project Settings >
