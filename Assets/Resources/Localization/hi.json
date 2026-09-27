@@ -81,5 +81,20 @@
 
   "module_fire_safety_training": "अग्नि सुरक्षा प्रशिक्षण",
 
-  "proximity_warning": "पीछे हटें! आग से 4 फीट के भीतर खड़े न हों।"
+  "proximity_warning": "पीछे हटें! आग से 4 फीट के भीतर खड़े न हों।",
+
+  "login_title": "कर्मचारी लॉगिन",
+  "login_worker_id": "कर्मचारी आईडी",
+  "login_password": "पासवर्ड",
+  "login_button": "लॉग इन करें",
+  "login_signing_in": "लॉग इन हो रहा है…",
+  "login_missing_fields": "अपनी कर्मचारी आईडी और पासवर्ड दर्ज करें।",
+  "login_invalid": "गलत कर्मचारी आईडी या पासवर्ड।",
+  "login_needs_internet": "इस डिवाइस पर पहली बार लॉग इन करने के लिए इंटरनेट से जुड़ें।",
+  "menu_logout": "लॉग आउट",
+  "sync_logged_in_as": "{0} ({1})",
+  "sync_status_synced": "सारी प्रगति सिंक हो गई",
+  "sync_status_pending": "{0} प्रयास सिंक होने की प्रतीक्षा में",
+  "sync_status_syncing": "सिंक हो रहा है…",
+  "sync_status_relogin": "{0} प्रयास सिंक करने के लिए ऑनलाइन रहते हुए फिर से लॉग इन करें"
 }

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SurakshaAR Admin</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">SurakshaAR <span>Admin</span></div>
+    <div class="topbar-right" id="session-box" hidden>
+      <span id="admin-email"></span>
+      <button class="ghost" id="signout-btn">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Sign in -->
+    <section id="view-login" class="view" hidden>
+      <form id="login-form" class="card narrow">
+        <h1>Admin sign in</h1>
+        <label>Email <input type="email" id="login-email" required autocomplete="username"></label>
+        <label>Password <input type="password" id="login-password" required autocomplete="current-password"></label>
+        <button type="submit" class="primary">Sign in</button>
+        <p class="error" id="login-error"></p>
+      </form>
+    </section>
+
+    <!-- Workers list -->
+    <section id="view-workers" class="view" hidden>
+      <div class="view-head">
+        <h1>Workers</h1>
+        <div class="actions">
+          <input type="search" id="worker-search" placeholder="Search name or ID">
+          <button class="primary" id="new-worker-btn">+ New worker</button>
+        </div>
+      </div>
+      <div class="tiles" id="overview-tiles"></div>
+      <div class="card table-wrap">
+        <table>
+          <thead>
+            <tr><th>Worker ID</th><th>Name</th><th>Status</th><th class="num">Attempts</th><th class="num">Pass rate</th><th>Last activity</th><th></th></tr>
+          </thead>
+          <tbody id="workers-body"></tbody>
+        </table>
+        <p class="empty" id="workers-empty" hidden>No workers yet. Create one to get started.</p>
+      </div>
+    </section>
+
+    <!-- Worker detail -->
+    <section id="view-worker" class="view" hidden>
+      <a href="#/workers" class="back">&larr; All workers</a>
+      <div class="view-head">
+        <div>
+          <h1 id="worker-name"></h1>
+          <div class="muted" id="worker-meta"></div>
+        </div>
+        <div class="actions">
+          <button class="ghost" id="export-csv-btn">Export CSV</button>
+          <button class="ghost" id="reset-pw-btn">Reset password</button>
+          <button class="ghost danger" id="toggle-active-btn"></button>
+        </div>
+      </div>
+      <div class="tiles" id="worker-tiles"></div>
+      <div class="card table-wrap">
+        <table>
+          <thead>
+            <tr><th>Completed</th><th>Module</th><th>Scenario</th><th>Result</th><th class="num">Score</th><th class="num">Time</th><th></th></tr>
+          </thead>
+          <tbody id="attempts-body"></tbody>
+        </table>
+        <p class="empty" id="attempts-empty" hidden>No training attempts synced yet.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Create worker -->
+  <dialog id="new-worker-dialog">
+    <form id="new-worker-form" method="dialog">
+      <h2>New worker</h2>
+      <label>Full name <input id="new-worker-name" required maxlength="80"></label>
+      <p class="error" id="new-worker-error"></p>
+      <div class="dialog-actions">
+        <button type="button" class="ghost" data-close>Cancel</button>
+        <button type="submit" class="primary">Create</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Show generated credentials once -->
+  <dialog id="credentials-dialog">
+    <div class="credentials printable">
+      <h2 id="cred-title">Login details</h2>
+      <p class="muted">Share these with the worker. The password is shown only once.</p>
+      <dl>
+        <dt>Name</dt><dd id="cred-name"></dd>
+        <dt>Worker ID</dt><dd class="mono" id="cred-code"></dd>
+        <dt>Password</dt><dd class="mono" id="cred-password"></dd>
+      </dl>
+      <div class="dialog-actions no-print">
+        <button type="button" class="ghost" id="cred-copy">Copy</button>
+        <button type="button" class="ghost" id="cred-print">Print</button>
+        <button type="button" class="primary" data-close>Done</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast" id="toast" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>

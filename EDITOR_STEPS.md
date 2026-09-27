@@ -134,3 +134,18 @@ Left for manual polish (none block a working play-through):
   advance), tap `Exit A`, walk to each waypoint in order (only the current one should be visible),
   reach `Assembly Point`, confirm `TrainingResultsUI` shows all 7 checklist lines + correct overall
   PASS/FAIL (a wrong-exit tap should force FAIL even if everything else was done correctly).
+
+## 9. Worker login + offline progress sync
+
+Already done: `Login.unity` (build index 0), Logout button and sync status on `MainMenu`, and
+`FireResponseCoordinator` now saves every completed attempt through `ProgressStore`.
+
+- **Supabase**: follow `dashboard/README.md` to create the project and run
+  `supabase/migrations/0001_init.sql`, then select `Assets/Resources/SupabaseConfig.asset` and fill
+  in `Project Url` and `Anon Key`. Until this is filled in, login only works for workers already
+  cached on the device, and progress stays queued locally.
+- **Santali**: the `login_*`, `menu_logout` and `sync_*` keys still need translating in
+  `Resources/Localization/sat.json`. They fall back to English for now.
+- **Other modules** (conveyor, hazard inspection): when they get a scored result, call
+  `ProgressStore.Record(module, scenario, passed, score, elapsedSeconds, detailsJson)` and the
+  result syncs and appears on the dashboard automatically.

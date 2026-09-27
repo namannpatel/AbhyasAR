@@ -9,6 +9,7 @@ using UnityEngine.SceneManagement;
 /// </summary>
 public class MenuManager : MonoBehaviour
 {
+    private const string LoginScene = "Login";
     private const string MainMenuScene = "MainMenu";
     private const string TutorialScene = "Tutorial";
     private const string CreditsScene = "MainMenu"; // No dedicated credits scene yet; update if one is added.
@@ -41,6 +42,12 @@ public class MenuManager : MonoBehaviour
     public void LoadCredits()
     {
         LoadScene(CreditsScene);
+    }
+
+    public void Logout()
+    {
+        AuthService.Logout();
+        LoadScene(LoginScene);
     }
 
     public void Quit()

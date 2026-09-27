@@ -196,7 +196,19 @@ public class FireResponseCoordinator : MonoBehaviour
         result.passed = extinguisherResult.passed && !forcedFailure;
         result.score = ComputeScore(result);
 
+        RecordProgress(result);
         OnModuleComplete?.Invoke(result);
+    }
+
+    private void RecordProgress(FireResponseResult result)
+    {
+        string scenario = gameObject.scene.name;
+        FireSource fire = extinguisherTracker != null ? extinguisherTracker.TargetFire : null;
+        if (fire != null)
+        {
+            scenario += "/" + fire.fireClass;
+        }
+        ProgressStore.Record("fire_safety", scenario, result.passed, result.score, result.elapsedSeconds, JsonUtility.ToJson(result));
     }
 
     /// <summary>

@@ -56,7 +56,9 @@ public class CertificateUI : MonoBehaviour
         {
             // Prefill with whatever name was used last time, so a returning trainee
             // doesn't have to retype it for every module.
-            nameInput.text = PlayerPrefs.GetString(TraineeNamePrefKey, string.Empty);
+            nameInput.text = AuthService.IsLoggedIn
+                ? AuthService.CurrentWorker.displayName
+                : PlayerPrefs.GetString(TraineeNamePrefKey, string.Empty);
         }
 
         if (panelRoot != null)

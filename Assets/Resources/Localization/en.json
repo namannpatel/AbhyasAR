@@ -81,5 +81,20 @@
 
   "module_fire_safety_training": "Fire Safety Training",
 
-  "proximity_warning": "Step back! Don't stand within 4 ft. of the fire."
+  "proximity_warning": "Step back! Don't stand within 4 ft. of the fire.",
+
+  "login_title": "Worker Login",
+  "login_worker_id": "Worker ID",
+  "login_password": "Password",
+  "login_button": "Log In",
+  "login_signing_in": "Signing in…",
+  "login_missing_fields": "Enter your worker ID and password.",
+  "login_invalid": "Wrong worker ID or password.",
+  "login_needs_internet": "Connect to the internet for your first login on this device.",
+  "menu_logout": "Log Out",
+  "sync_logged_in_as": "{0} ({1})",
+  "sync_status_synced": "All progress synced",
+  "sync_status_pending": "{0} attempt(s) waiting to sync",
+  "sync_status_syncing": "Syncing…",
+  "sync_status_relogin": "Log in again while online to sync {0} attempt(s)"
 }
