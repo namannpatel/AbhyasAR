@@ -21,8 +21,15 @@ public class CertificateUI : MonoBehaviour
     private const string TraineeNamePrefKey = "ARBT_TraineeName";
 
     private string moduleName;
+    private string moduleKey;
     private int score;
     private bool showing;
+    private GameObject certificateVisual;
+    private RawImage certificateQr;
+    private TMP_Text certificateName;
+    private TMP_Text certificateModule;
+    private TMP_Text certificateDate;
+    private TMP_Text certificateMeta;
 
     private void Awake()
     {
@@ -53,6 +60,12 @@ public class CertificateUI : MonoBehaviour
     /// </summary>
     public void Show(string forModuleName, int forScore)
     {
+        Show(InferModuleKey(forModuleName), forModuleName, forScore);
+    }
+
+    public void Show(string forModuleKey, string forModuleName, int forScore)
+    {
+        moduleKey = forModuleKey;
         moduleName = forModuleName;
         score = forScore;
 
@@ -75,6 +88,10 @@ public class CertificateUI : MonoBehaviour
         {
             qrImage.texture = null;
         }
+        if (certificateVisual != null)
+        {
+            certificateVisual.SetActive(false);
+        }
         if (detailsText != null)
         {
             detailsText.text = LocalizationManager.Get("cert_enter_name_prompt");
@@ -89,16 +106,66 @@ public class CertificateUI : MonoBehaviour
     /// </summary>
     public void ShowAndGenerate(string forModuleName, int forScore)
     {
-        Show(forModuleName, forScore);
-        if (nameInput != null && !string.IsNullOrWhiteSpace(nameInput.text))
+        ShowAndGenerate(InferModuleKey(forModuleName), forModuleName, forScore);
+    }
+
+    public void ShowAndGenerate(string forModuleKey, string forModuleName, int forScore)
+    {
+        Show(forModuleKey, forModuleName, forScore);
+        string knownName = AuthService.IsLoggedIn
+            ? AuthService.CurrentWorker.displayName
+            : nameInput != null ? nameInput.text : string.Empty;
+        if (!string.IsNullOrWhiteSpace(knownName))
         {
             HandleGenerate();
         }
     }
 
+    /// <summary>
+    /// Opens the certificate from any training scene. It reuses an authored CertificateUI when
+    /// available and creates a full-screen runtime host otherwise (FireTraining currently has no
+    /// serialized certificate panel).
+    /// </summary>
+    public static void ShowForTraining(string forModuleKey, string forModuleName, int forScore)
+    {
+        CertificateUI target = null;
+        foreach (var candidate in Resources.FindObjectsOfTypeAll<CertificateUI>())
+        {
+            if (candidate.gameObject.scene.IsValid())
+            {
+                target = candidate;
+                break;
+            }
+        }
+
+        if (target == null)
+        {
+            Canvas canvas = FindFirstObjectByType<Canvas>();
+            if (canvas == null)
+            {
+                Debug.LogError("CertificateUI: no Canvas found in this scene.");
+                return;
+            }
+            var host = new GameObject("RuntimeCertificatePanel", typeof(RectTransform), typeof(Image));
+            host.transform.SetParent(canvas.transform, false);
+            var rect = host.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            host.GetComponent<Image>().color = new Color(0.03f, 0.04f, 0.07f, 0.96f);
+            target = host.AddComponent<CertificateUI>();
+            target.panelRoot = host;
+        }
+
+        target.ShowAndGenerate(forModuleKey, forModuleName, forScore);
+    }
+
     private void HandleGenerate()
     {
-        string traineeName = nameInput != null ? nameInput.text.Trim() : string.Empty;
+        string traineeName = AuthService.IsLoggedIn
+            ? AuthService.CurrentWorker.displayName
+            : nameInput != null ? nameInput.text.Trim() : string.Empty;
         if (string.IsNullOrEmpty(traineeName))
         {
             if (detailsText != null)
@@ -111,8 +178,9 @@ public class CertificateUI : MonoBehaviour
         PlayerPrefs.SetString(TraineeNamePrefKey, traineeName);
         PlayerPrefs.Save();
 
-        string payload = CertificateService.GenerateCertificate(traineeName, moduleName, score, DateTime.UtcNow);
-        Texture2D qrTexture = CertificateService.RenderQrTexture(payload);
+        var certificate = CertificateStore.GetOrCreate(moduleKey, score, DateTime.UtcNow);
+        string verificationUrl = CertificateService.BuildVerificationUrl(certificate.id);
+        Texture2D qrTexture = CertificateService.RenderQrTexture(verificationUrl);
 
         if (qrImage != null)
         {
@@ -122,6 +190,8 @@ public class CertificateUI : MonoBehaviour
         {
             detailsText.text = LocalizationManager.Get("cert_details_format", traineeName, moduleName, score);
         }
+        ShowCertificateArtwork(traineeName, certificate, qrTexture);
+        SyncService.Instance?.RequestSyncSoon();
     }
 
     private void HandleClose()
@@ -130,5 +200,107 @@ public class CertificateUI : MonoBehaviour
         {
             panelRoot.SetActive(false);
         }
+    }
+
+    private void ShowCertificateArtwork(string traineeName, CertificateRecord certificate, Texture2D qrTexture)
+    {
+        EnsureCertificateArtwork();
+        if (certificateVisual == null) return;
+
+        certificateName.text = traineeName;
+        certificateModule.text = $"For successfully completing {moduleName}.";
+        DateTime issuedAt = DateTime.TryParse(certificate.issuedAtUtc, out var parsed) ? parsed : DateTime.UtcNow;
+        certificateDate.text = issuedAt.ToLocalTime().ToString("dd MMMM yyyy");
+        string shortId = string.IsNullOrEmpty(certificate.id)
+            ? "—"
+            : certificate.id.Substring(0, Math.Min(8, certificate.id.Length)).ToUpperInvariant();
+        certificateMeta.text = $"Score {certificate.score}/100   •   Certificate {shortId}";
+        certificateQr.texture = qrTexture;
+        certificateVisual.SetActive(true);
+        certificateVisual.transform.SetAsLastSibling();
+    }
+
+    private void EnsureCertificateArtwork()
+    {
+        if (certificateVisual != null || panelRoot == null) return;
+        Texture2D template = Resources.Load<Texture2D>("Certificates/SurakshaCertificateTemplate");
+        if (template == null)
+        {
+            Debug.LogError("CertificateUI: certificate template is missing from Resources/Certificates.");
+            return;
+        }
+
+        certificateVisual = new GameObject("CertificateArtwork", typeof(RectTransform), typeof(Image));
+        certificateVisual.transform.SetParent(panelRoot.transform, false);
+        var rootRect = certificateVisual.GetComponent<RectTransform>();
+        rootRect.anchorMin = Vector2.zero;
+        rootRect.anchorMax = Vector2.one;
+        rootRect.offsetMin = Vector2.zero;
+        rootRect.offsetMax = Vector2.zero;
+        certificateVisual.GetComponent<Image>().color = new Color(0.03f, 0.04f, 0.07f, 0.97f);
+
+        var frame = new GameObject("Certificate", typeof(RectTransform), typeof(RawImage), typeof(AspectRatioFitter));
+        frame.transform.SetParent(certificateVisual.transform, false);
+        var frameRect = frame.GetComponent<RectTransform>();
+        frameRect.anchorMin = new Vector2(0.035f, 0.055f);
+        frameRect.anchorMax = new Vector2(0.965f, 0.945f);
+        frameRect.offsetMin = Vector2.zero;
+        frameRect.offsetMax = Vector2.zero;
+        frame.GetComponent<RawImage>().texture = template;
+        frame.GetComponent<AspectRatioFitter>().aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+        frame.GetComponent<AspectRatioFitter>().aspectRatio = 1607f / 1080f;
+
+        certificateName = AddText(frame.transform, "TraineeName", new Vector2(0.20f, 0.57f), new Vector2(0.80f, 0.67f), 52, FontStyles.Bold);
+        certificateModule = AddText(frame.transform, "Module", new Vector2(0.16f, 0.32f), new Vector2(0.79f, 0.45f), 29, FontStyles.Normal);
+        certificateDate = AddText(frame.transform, "IssueDate", new Vector2(0.45f, 0.23f), new Vector2(0.68f, 0.30f), 25, FontStyles.Bold);
+        certificateMeta = AddText(frame.transform, "CertificateMeta", new Vector2(0.16f, 0.08f), new Vector2(0.66f, 0.15f), 17, FontStyles.Normal);
+
+        var qr = new GameObject("VerificationQr", typeof(RectTransform), typeof(RawImage));
+        qr.transform.SetParent(frame.transform, false);
+        var qrRect = qr.GetComponent<RectTransform>();
+        qrRect.anchorMin = new Vector2(0.79f, 0.055f);
+        qrRect.anchorMax = new Vector2(0.925f, 0.255f);
+        qrRect.offsetMin = Vector2.zero;
+        qrRect.offsetMax = Vector2.zero;
+        certificateQr = qr.GetComponent<RawImage>();
+
+        var close = new GameObject("CloseCertificate", typeof(RectTransform), typeof(Image), typeof(Button));
+        close.transform.SetParent(certificateVisual.transform, false);
+        var closeRect = close.GetComponent<RectTransform>();
+        closeRect.anchorMin = closeRect.anchorMax = new Vector2(0.975f, 0.96f);
+        closeRect.sizeDelta = new Vector2(52, 52);
+        close.GetComponent<Image>().color = new Color(0.11f, 0.13f, 0.2f, 0.94f);
+        close.GetComponent<Button>().onClick.AddListener(HandleClose);
+        var closeLabel = AddText(close.transform, "Label", Vector2.zero, Vector2.one, 28, FontStyles.Normal, Color.white);
+        closeLabel.text = "×";
+    }
+
+    private static TMP_Text AddText(Transform parent, string objectName, Vector2 anchorMin, Vector2 anchorMax,
+        float fontSize, FontStyles style, Color? color = null)
+    {
+        var go = new GameObject(objectName, typeof(RectTransform), typeof(TextMeshProUGUI));
+        go.transform.SetParent(parent, false);
+        var rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = anchorMin;
+        rect.anchorMax = anchorMax;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        var text = go.GetComponent<TextMeshProUGUI>();
+        text.alignment = TextAlignmentOptions.Center;
+        text.enableAutoSizing = true;
+        text.fontSizeMax = fontSize;
+        text.fontSizeMin = Mathf.Max(11, fontSize * 0.48f);
+        text.fontStyle = style;
+        text.color = color ?? new Color32(46, 58, 81, 255);
+        text.enableWordWrapping = true;
+        return text;
+    }
+
+    private static string InferModuleKey(string localizedName)
+    {
+        string value = (localizedName ?? string.Empty).ToLowerInvariant();
+        return value.Contains("fire") || value.Contains("अग्नि") || value.Contains("ᱥᱮᱸᱜᱮᱞ")
+            ? "fire_safety"
+            : "machine_training";
     }
 }

@@ -47,8 +47,8 @@ body {
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
   min-height: 100vh;
 }
-body[data-view="login"] { grid-template-columns: minmax(0, 1fr); }
-body[data-view="login"] .rail { display: none; }
+body[data-view="login"], body[data-view="public-certificate"] { grid-template-columns: minmax(0, 1fr); }
+body[data-view="login"] .rail, body[data-view="public-certificate"] .rail { display: none; }
 
 ::selection { background: var(--accent); color: var(--on-accent); }
 a { color: var(--accent); }
@@ -121,7 +121,7 @@ a { color: var(--accent); }
 
 /* ------------------------------------------------------------ page */
 main { min-width: 0; padding: 28px clamp(16px, 3.4vw, 48px) 80px; container: page / inline-size; }
-body[data-view="login"] main { padding: 0; }
+body[data-view="login"] main, body[data-view="public-certificate"] main { padding: 0; }
 
 h1, h2, h3 { font-family: var(--display); font-stretch: 80%; text-transform: uppercase; margin: 0; letter-spacing: -0.005em; }
 h1 { font-weight: 900; }
@@ -470,6 +470,31 @@ table.sortable th[aria-sort="descending"]::after { content: " ↓"; }
 .viz-meter-sub { font: 400 12px var(--mono); margin-top: 6px; }
 
 /* ------------------------------------------------------------ login */
+.public-certificate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: clamp(22px, 5vw, 72px);
+  background:
+    linear-gradient(135deg, transparent 0 72%, rgba(255, 210, 10, 0.18) 72% 100%),
+    var(--surface);
+}
+.certificate-check { width: min(720px, 100%); }
+.public-wordmark { display: inline-flex; writing-mode: horizontal-tb; transform: none; padding: 0; margin-bottom: 64px; font-size: 38px; }
+.public-certificate .kicker { margin: 0 0 14px; }
+.public-certificate-result { border-top: 4px solid var(--ink); padding-top: 28px; }
+.public-status { display: grid; grid-template-columns: 76px 1fr; gap: 4px 24px; align-items: start; }
+.public-status .status-mark { grid-row: 1 / span 3; display: grid; place-items: center; width: 76px; height: 76px; border: 3px solid var(--ink); font: 800 42px/1 var(--display); }
+.public-status.valid .status-mark { background: var(--ink); color: var(--accent); }
+.public-status.invalid .status-mark { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.public-status.pending .status-mark { background: var(--bg); color: var(--ink); }
+.public-status h1 { margin: 0; font-size: clamp(46px, 8vw, 86px); line-height: 0.9; }
+.public-status > p { grid-column: 2; margin: 10px 0 0; }
+.public-status dl { grid-column: 2; margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); }
+.public-status dd { overflow-wrap: anywhere; }
+.public-lead { font-size: 16px; }
+.certificate-id { font: 500 11px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+
 .login { display: grid; grid-template-columns: minmax(0, 7fr) minmax(320px, 5fr); min-height: 100vh; }
 .login-art {
   position: relative;
@@ -598,6 +623,11 @@ dd { margin: 0; font-weight: 600; }
   .steps li { flex-direction: column; gap: 2px; }
   .steps .state { white-space: normal; }
   .module-card { padding: 16px 14px; }
+  .public-wordmark { margin-bottom: 42px; font-size: 30px; }
+  .public-status { grid-template-columns: 54px 1fr; gap: 6px 14px; }
+  .public-status .status-mark { width: 54px; height: 54px; font-size: 30px; }
+  .public-status h1 { font-size: 42px; }
+  .public-status dl { grid-column: 1 / -1; }
 }
 
 /* ------------------------------------------------------------ print (credentials sheet only) */

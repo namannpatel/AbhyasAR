@@ -143,7 +143,8 @@ public class MachineTrainingResultsUI : MonoBehaviour
 
         if (TrainingPassed)
         {
-            certificateUI?.ShowAndGenerate(LocalizationManager.Get("module_machine_safety_training"), TotalScore);
+            CertificateUI.ShowForTraining("machine_training",
+                LocalizationManager.Get("module_machine_safety_training"), TotalScore);
         }
     }
 

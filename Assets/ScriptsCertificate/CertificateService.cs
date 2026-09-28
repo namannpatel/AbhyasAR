@@ -31,6 +31,7 @@ public struct CertificateInfo
 /// </summary>
 public static class CertificateService
 {
+    public const string VerificationBaseUrl = "https://namannpatel.github.io/SurakshaAR/#/verify/";
     private const string Prefix = "AR-CERT";
     private const string PayloadVersion = "v1";
     private const int ExpectedFieldCount = 7; // Prefix, version, name, module, score, timestamp, checksum
@@ -138,6 +139,15 @@ public static class CertificateService
         texture.SetPixels32(pixels);
         texture.Apply();
         return texture;
+    }
+
+    /// <summary>
+    /// Public HTTPS URL encoded by new certificates. A normal phone camera can open it; the
+    /// dashboard then asks Supabase for the server-backed issuance record identified by the UUID.
+    /// </summary>
+    public static string BuildVerificationUrl(string certificateId)
+    {
+        return VerificationBaseUrl + Uri.EscapeDataString(certificateId ?? string.Empty);
     }
 
     private static string ComputeChecksum(string body)

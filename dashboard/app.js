@@ -10,6 +10,7 @@ const $ = (id) => document.getElementById(id);
 const state = {
   workers: [],
   attempts: [],
+  issuedCertificates: [],
   byWorker: new Map(),      // worker id -> attempts (newest first)
   certs: new Map(),         // worker id -> { fire_safety: cert, machine_training: cert }
   loadedAt: 0,
@@ -119,6 +120,7 @@ async function loadAll() {
     }
     state.workers = workers;
     state.attempts = attempts;
+    state.issuedCertificates = await rpc("admin_list_certificates").catch(() => []);
     state.byWorker = new Map(workers.map((w) => [w.id, []]));
     for (const a of attempts) (state.byWorker.get(a.worker_id) || state.byWorker.set(a.worker_id, []).get(a.worker_id)).push(a);
     state.certs = new Map(workers.map((w) => [w.id, Object.fromEntries(MODULE_KEYS.map((m) => [m, certification(state.byWorker.get(w.id), m)]))]));
@@ -723,30 +725,65 @@ function certificateRows() {
   for (const w of state.workers) {
     const certs = state.certs.get(w.id);
     for (const m of MODULE_KEYS) {
-      if ((filter === "all" || filter === m) && certs[m].certifiedAt) rows.push({ w, m, c: certs[m] });
+      if ((filter === "all" || filter === m) && certs[m].certifiedAt) {
+        const issued = state.issuedCertificates.find((x) => x.worker_id === w.id && x.module === m) || null;
+        rows.push({ w, m, c: certs[m], issued });
+      }
     }
   }
-  return rows.sort((a, b) => Date.parse(b.c.certifiedAt) - Date.parse(a.c.certifiedAt));
+  return rows.sort((a, b) => Date.parse(b.issued?.issued_at || b.c.certifiedAt) - Date.parse(a.issued?.issued_at || a.c.certifiedAt));
 }
 
 function renderCertificates() {
   const rows = certificateRows();
-  $("certs-body").replaceChildren(...rows.map(({ w, m, c }) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/worker/${w.id}`) },
-    el("td", {}, fmtDate(c.certifiedAt)),
+  $("certs-body").replaceChildren(...rows.map(({ w, m, c, issued }) => el("tr", { class: "clickable", onclick: () => (location.hash = `#/worker/${w.id}`) },
+    el("td", {}, fmtDate(issued?.issued_at || c.certifiedAt)),
     el("td", { class: "mono" }, w.worker_code),
     el("td", {}, w.display_name),
     el("td", {}, moduleLabel(m)),
-    el("td", { class: "num" }, `${c.certifiedTotal}/100`),
-    el("td", {}, el("span", { class: w.active ? "badge pass" : "badge off" }, w.active ? "Active" : "Disabled")))));
+    el("td", { class: "num" }, `${issued?.score ?? c.certifiedTotal}/100`),
+    el("td", {}, el("span", { class: issued ? "badge pass" : "badge warn" }, issued ? "Synced & verifiable" : "Passed · awaiting issue")))));
   $("certs-empty").hidden = rows.length > 0;
   $("certs-count").textContent = `${rows.length} certificate${rows.length === 1 ? "" : "s"}`;
 }
 
 $("export-certs-btn").addEventListener("click", () => {
-  downloadCsv("surakshaar-certificates.csv", ["certified_at", "worker_id", "name", "training", "total_score", "best_quiz", "worker_status"],
-    certificateRows().map(({ w, m, c }) => [c.certifiedAt, w.worker_code, w.display_name, moduleLabel(m), c.certifiedTotal,
-      c.bestQuiz ? (c.bestQuiz.correct != null ? `${c.bestQuiz.correct}/${c.bestQuiz.total}` : `${c.bestQuiz.pct}%`) : "", w.active ? "active" : "disabled"]));
+  downloadCsv("surakshaar-certificates.csv", ["certified_at", "worker_id", "name", "training", "total_score", "certificate_id", "verification_url", "sync_status"],
+    certificateRows().map(({ w, m, c, issued }) => [issued?.issued_at || c.certifiedAt, w.worker_code, w.display_name, moduleLabel(m), issued?.score ?? c.certifiedTotal,
+      issued?.id || "", issued ? `${location.origin}${location.pathname}#/verify/${issued.id}` : "", issued ? "synced" : "awaiting_issue"]));
 });
+
+async function renderPublicCertificate(certificateId) {
+  const out = $("public-certificate-result");
+  const validId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(certificateId);
+  if (!validId) {
+    out.replaceChildren(el("div", { class: "public-status invalid" }, el("span", { class: "status-mark" }, "×"),
+      el("h1", {}, "Invalid certificate link"), el("p", {}, "This QR code does not contain a valid SurakshaAR certificate ID.")));
+    return;
+  }
+  try {
+    const result = await rpc("verify_certificate", { p_certificate_id: certificateId });
+    if (!result?.valid) {
+      out.replaceChildren(el("div", { class: "public-status pending" }, el("span", { class: "status-mark" }, "…"),
+        el("h1", {}, "Certificate not found"),
+        el("p", {}, "It may still be waiting for the trainee's device to sync. Try scanning again when the device is online."),
+        el("p", { class: "certificate-id" }, `ID ${certificateId}`)));
+      return;
+    }
+    out.replaceChildren(el("div", { class: "public-status valid" }, el("span", { class: "status-mark" }, "✓"),
+      el("h1", {}, "Certificate verified"),
+      el("p", { class: "public-lead" }, "Supabase confirms that this certificate was issued by SurakshaAR."),
+      el("dl", {},
+        el("dt", {}, "Trainee"), el("dd", {}, result.trainee_name),
+        el("dt", {}, "Training"), el("dd", {}, moduleLabel(result.module)),
+        el("dt", {}, "Score"), el("dd", {}, `${result.score}/100`),
+        el("dt", {}, "Issued"), el("dd", {}, fmtDate(result.issued_at)),
+        el("dt", {}, "Certificate ID"), el("dd", { class: "mono" }, result.certificate_id))));
+  } catch (err) {
+    out.replaceChildren(el("div", { class: "public-status invalid" }, el("span", { class: "status-mark" }, "!"),
+      el("h1", {}, "Verification unavailable"), el("p", {}, "The certificate service could not be reached. Please try again.")));
+  }
+}
 
 $("verify-form").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -830,11 +867,18 @@ async function route(keepScroll = false) {
       el("p", {}, "Fill in your Supabase project URL and anon key in ", el("span", { class: "mono" }, "dashboard/config.js"), " (see the README)."));
     return;
   }
+  const hash = location.hash || "#/overview";
+  if (hash.startsWith("#/verify/")) {
+    $("session-box").hidden = true;
+    $("nav").hidden = true;
+    showView("public-certificate");
+    await renderPublicCertificate(decodeURIComponent(hash.slice("#/verify/".length)));
+    return;
+  }
   if (!(await requireAdmin())) {
     showView("login");
     return;
   }
-  const hash = location.hash || "#/overview";
   try {
     await ensureData();
     if (hash.startsWith("#/worker/")) {

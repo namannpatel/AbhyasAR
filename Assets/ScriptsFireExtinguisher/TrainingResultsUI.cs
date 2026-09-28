@@ -270,7 +270,8 @@ public class TrainingResultsUI : MonoBehaviour
 
         if (TrainingPassed)
         {
-            certificateUI?.ShowAndGenerate(LocalizationManager.Get("module_fire_safety_training"), TotalScore);
+            CertificateUI.ShowForTraining("fire_safety",
+                LocalizationManager.Get("module_fire_safety_training"), TotalScore);
         }
     }
 

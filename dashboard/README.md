@@ -7,7 +7,7 @@ A static site with no build step. Admins use it to manage worker logins, follow 
 | **Overview** | Key numbers and charts for a chosen period and training: activity over time, certification progress, pass rate per training part, the fire-scenario steps trainees miss most, and quiz score spread. Every chart has a **Table** view. |
 | **Workers** | Everyone's login status and certification per training (Fire Safety, Machinery Training), with search, filters, sorting and CSV export. **+ Add workers** creates one or many logins at once. |
 | **Worker detail** | Progress per training (each fire scenario, conveyor practice, best quiz score), full attempt history with step-by-step details, and account actions: rename, reset password, disable/enable login, delete. |
-| **Certificates** | Every certificate earned, exportable, plus **Verify a certificate**: paste the text from a certificate's QR code to check it against the worker's synced records. |
+| **Certificates** | Every certificate earned and its sync status, exportable with a public verification URL. New QR codes open the public verifier directly; the legacy paste checker remains available. |
 | **Admins** | Who can sign in to the dashboard; give or remove admin access. |
 
 **Certified** means the same as in the app: the training's practical part was passed **and** its quiz was passed afterwards. (Fire Safety: the fire scenarios, then the fire quiz. Machinery Training: all 7 conveyor controls practised, then the machine quiz.)
@@ -18,6 +18,7 @@ A static site with no build step. Admins use it to manage worker logins, follow 
 2. Open **SQL Editor** and run, in order:
    - `supabase/migrations/0001_init.sql`
    - `supabase/migrations/0002_admin_dashboard.sql` (adds bulk add, rename, delete and admin management; safe to run again)
+   - `supabase/migrations/0003_certificates.sql` (adds server-backed issuance and public QR verification; safe to run again)
 3. Go to **Authentication → Users → Add user**, create an admin with an email and password, and copy that user's UUID.
 4. In the SQL Editor, run:
    ```sql
@@ -31,7 +32,7 @@ A static site with no build step. Admins use it to manage worker logins, follow 
 
    The anon key is meant to be public: every table has row-level security, and all admin actions check the `admins` table on the server. **Never** put the `service_role` key in either file.
 
-Already running the dashboard from before? Just run `0002_admin_dashboard.sql` once; nothing existing changes.
+Already running the dashboard from before? Run any migration you have not applied yet, in number order. Existing workers and attempts are preserved.
 
 ## Running
 
@@ -53,7 +54,11 @@ Already running the dashboard from before? Just run `0002_admin_dashboard.sql` o
 
 ## Verifying certificates
 
-The app's certificate QR holds `AR-CERT|v1|name|training|score|time|checksum`. The checksum only shows the text wasn't casually edited: its key is in the app's (public) source code, so anyone could make a valid-looking one. The dashboard therefore also looks for a worker with that name whose synced records show the training passed within a day of the certificate's time:
+New certificates encode `https://namannpatel.github.io/SurakshaAR/#/verify/<certificate-id>`. A normal phone camera opens this route without an admin login. The route calls the public `verify_certificate` RPC, which returns only the trainee name, training, score, issue time and certificate ID for a real server-backed issuance. Worker codes, attempts and login details remain private.
+
+The Unity app stores a certificate locally first, just like progress. `SyncService` uploads the passed attempts and then the issuance. Until that sync succeeds, the public page reports that the certificate has not reached the server yet.
+
+Legacy QR payloads using `AR-CERT|v1|name|training|score|time|checksum` can still be pasted into the admin checker. The dashboard then compares them with synced training records.
 
 - **✓ Verified against training records**: genuine.
 - **⚠ Not confirmed**: the checksum is fine but there's no matching record. The worker may have trained offline and not synced yet; otherwise treat it as not verified.

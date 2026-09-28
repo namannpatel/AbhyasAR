@@ -55,6 +55,22 @@ public class SyncService : MonoBehaviour
         public string[] accepted;
     }
 
+    [Serializable]
+    private class CertificateDto
+    {
+        public string id;
+        public string module;
+        public int score;
+        public string issued_at;
+    }
+
+    [Serializable]
+    private class CertificateSubmitRequest
+    {
+        public string p_token;
+        public CertificateDto[] p_certificates;
+    }
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Bootstrap()
     {
@@ -76,12 +92,14 @@ public class SyncService : MonoBehaviour
     private void OnEnable()
     {
         ProgressStore.OnRecordAdded += HandleLocalChange;
+        CertificateStore.OnRecordAdded += HandleLocalChange;
         AuthService.OnSessionChanged += HandleLocalChange;
     }
 
     private void OnDisable()
     {
         ProgressStore.OnRecordAdded -= HandleLocalChange;
+        CertificateStore.OnRecordAdded -= HandleLocalChange;
         AuthService.OnSessionChanged -= HandleLocalChange;
     }
 
@@ -130,10 +148,17 @@ public class SyncService : MonoBehaviour
             }
         }
 
-        var workers = new List<string>();
+        var workers = new HashSet<string>();
         foreach (string workerId in ProgressStore.WorkerIdsWithData())
         {
             if (tokens.ContainsKey(workerId) && ProgressStore.CountUnsynced(workerId) > 0)
+            {
+                workers.Add(workerId);
+            }
+        }
+        foreach (string workerId in CertificateStore.WorkerIdsWithData())
+        {
+            if (tokens.ContainsKey(workerId) && CertificateStore.CountUnsynced(workerId) > 0)
             {
                 workers.Add(workerId);
             }
@@ -190,6 +215,43 @@ public class SyncService : MonoBehaviour
                 }
                 break;
             }
+
+            // Certificates are deliberately uploaded after attempts: the database accepts an
+            // issuance only when it can see the passed practical and quiz records behind it.
+            List<CertificateRecord> certificateBatch;
+            while (!networkFailed && (certificateBatch = CertificateStore.GetUnsynced(workerId, 20)).Count > 0)
+            {
+                RpcResult rpc = default;
+                yield return SupabaseRpc.Call("submit_certificates",
+                    BuildCertificateRequest(tokens[workerId], certificateBatch), r => rpc = r);
+
+                if (rpc.Ok)
+                {
+                    var accepted = JsonUtility.FromJson<SubmitResponse>(rpc.body)?.accepted ?? Array.Empty<string>();
+                    CertificateStore.MarkSynced(workerId, new HashSet<string>(accepted));
+                    LastSyncUtc = DateTime.UtcNow;
+                    if (accepted.Length < certificateBatch.Count)
+                    {
+                        Debug.LogWarning($"SyncService: server accepted {accepted.Length}/{certificateBatch.Count} certificates for {workerId}; the rest will be retried.");
+                        break;
+                    }
+                    continue;
+                }
+
+                if (rpc.status == RpcStatus.NetworkError)
+                {
+                    networkFailed = true;
+                }
+                else if (rpc.errorMessage == "invalid_token")
+                {
+                    AuthService.InvalidateToken(workerId);
+                }
+                else
+                {
+                    Debug.LogError($"SyncService: server rejected certificate upload for {workerId}: {rpc.errorMessage}");
+                }
+                break;
+            }
             if (networkFailed)
             {
                 break;
@@ -237,9 +299,33 @@ public class SyncService : MonoBehaviour
         return JsonUtility.ToJson(new SubmitRequest { p_token = token, p_attempts = attempts });
     }
 
+    private static string BuildCertificateRequest(string token, List<CertificateRecord> batch)
+    {
+        var certificates = new CertificateDto[batch.Count];
+        for (int i = 0; i < batch.Count; i++)
+        {
+            var record = batch[i];
+            certificates[i] = new CertificateDto
+            {
+                id = record.id,
+                module = record.module,
+                score = record.score,
+                issued_at = record.issuedAtUtc,
+            };
+        }
+        return JsonUtility.ToJson(new CertificateSubmitRequest
+        {
+            p_token = token,
+            p_certificates = certificates,
+        });
+    }
+
     private static void RefreshStatus()
     {
-        PendingCount = AuthService.IsLoggedIn ? ProgressStore.CountUnsynced(AuthService.CurrentWorker.workerId) : 0;
+        PendingCount = AuthService.IsLoggedIn
+            ? ProgressStore.CountUnsynced(AuthService.CurrentWorker.workerId)
+              + CertificateStore.CountUnsynced(AuthService.CurrentWorker.workerId)
+            : 0;
         OnStatusChanged?.Invoke();
     }
 }

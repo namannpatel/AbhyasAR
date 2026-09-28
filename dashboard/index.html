@@ -53,6 +53,18 @@
       </form>
     </section>
 
+    <!-- Public QR destination; no admin sign-in required. -->
+    <section id="view-public-certificate" class="view public-certificate" hidden>
+      <div class="certificate-check">
+        <a class="wordmark public-wordmark" href="#/overview"><span>SURAKSHA</span><b>AR</b></a>
+        <p class="kicker">Certificate verification</p>
+        <div id="public-certificate-result" class="public-certificate-result" aria-live="polite">
+          <h1>Checking certificate…</h1>
+          <p class="muted">Looking up the issued training record.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Overview -->
     <section id="view-overview" class="view" hidden>
       <header class="view-head">
@@ -186,7 +198,7 @@
       <form class="card verify offset" id="verify-form">
         <div class="verify-head">
           <h2>Verify a certificate</h2>
-          <p class="muted">Scan the QR code on the worker's certificate and paste the text. It starts with <span class="mono">AR-CERT|</span></p>
+          <p class="muted">New QR codes open a public verification page automatically. Legacy certificates can still be checked by pasting their <span class="mono">AR-CERT|</span> text here.</p>
         </div>
         <div class="verify-row">
           <textarea id="verify-input" rows="2" required placeholder="AR-CERT|v1|…" spellcheck="false"></textarea>
@@ -207,7 +219,7 @@
       <div class="card table-wrap">
         <table>
           <thead>
-            <tr><th>Certified</th><th>Worker</th><th>Name</th><th>Training</th><th class="num">Score</th><th>Status</th></tr>
+            <tr><th>Certified</th><th>Worker</th><th>Name</th><th>Training</th><th class="num">Score</th><th>Certificate sync</th></tr>
           </thead>
           <tbody id="certs-body"></tbody>
         </table>
