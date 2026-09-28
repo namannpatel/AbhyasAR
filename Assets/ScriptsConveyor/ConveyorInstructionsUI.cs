@@ -5,8 +5,13 @@ using UnityEngine;
 /// Single-line "what to do next" prompt for the Conveyor Belt module -- same per-frame
 /// recomputed-from-state role as ChemicalInstructionsUI/TrainingInstructionsUI. Priority
 /// order (highest first) so it never says two contradictory things at once: not placed,
-/// then E-stopped, then whichever of Auto/Manual is the current mode. A short suffix reports
+/// then the practice tracker's next task, then (free play once the practice is done)
+/// E-stopped, then whichever of Auto/Manual is the current mode. A short suffix reports
 /// speed (and, only when relevant, Manual mode) without cluttering the main line.
+///
+/// Also drives narration, like TrainingInstructionsUI: every branch yields a stable id that is
+/// both the LocalizationManager key and the NarrationPlayer clip id, and a line is spoken only
+/// on the frame that id changes.
 /// </summary>
 public class ConveyorInstructionsUI : MonoBehaviour
 {
@@ -15,12 +20,22 @@ public class ConveyorInstructionsUI : MonoBehaviour
     [Tooltip("Shared AR toolbar chrome (see ArHudToolbar) -- optional, wires this module's timer and reposition action into it if present.")]
     [SerializeField] private ArHudToolbar toolbar;
 
+    [Tooltip("Practice tracker -- while tasks remain, its 'Task n/7' line replaces the free-play prompts below. Auto-found if left empty.")]
+    [SerializeField] private ConveyorTrainingTracker tracker;
+
     private ConveyorPlacementController placementController;
     private ConveyorSpeedDialController speedDial;
+    private NarrationPlayer narrationPlayer;
+    private string lastNarrationId;
 
     private void OnEnable()
     {
         placementController = FindFirstObjectByType<ConveyorPlacementController>();
+        narrationPlayer = FindAnyObjectByType<NarrationPlayer>();
+        if (tracker == null)
+        {
+            tracker = FindAnyObjectByType<ConveyorTrainingTracker>();
+        }
 
         if (toolbar != null)
         {
@@ -36,11 +51,19 @@ public class ConveyorInstructionsUI : MonoBehaviour
             return;
         }
 
-        label.text = GetCurrentInstruction();
+        label.text = GetCurrentInstruction(out string narrationId);
+
+        if (narrationId != lastNarrationId)
+        {
+            lastNarrationId = narrationId;
+            narrationPlayer?.Play(narrationId);
+        }
     }
 
-    private string GetCurrentInstruction()
+    private string GetCurrentInstruction(out string narrationId)
     {
+        narrationId = null;
+
         if (placementController == null)
         {
             placementController = FindFirstObjectByType<ConveyorPlacementController>();
@@ -52,7 +75,8 @@ public class ConveyorInstructionsUI : MonoBehaviour
 
         if (placementController.PlacedConveyor == null)
         {
-            return "Tap the floor to place the conveyor";
+            narrationId = "conveyor_prompt_place";
+            return LocalizationManager.Get(narrationId);
         }
 
         var motion = placementController.MotionController;
@@ -61,25 +85,26 @@ public class ConveyorInstructionsUI : MonoBehaviour
             return string.Empty;
         }
 
-        string line;
+        string taskLine = tracker != null ? tracker.CurrentInstruction(motion, out narrationId) : null;
+        if (taskLine != null)
+        {
+            return taskLine + GetStatusSuffix(motion);
+        }
+
         if (motion.IsEStopped)
         {
-            line = "E-STOPPED — tap the E-stop again to reset before continuing";
+            narrationId = "conveyor_estopped";
         }
         else if (motion.Mode == ConveyorMotionController.OperatingMode.Manual)
         {
-            line = motion.IsJogging
-                ? "Release to stop jogging the belt"
-                : "Hold the green button to jog the belt";
+            narrationId = motion.IsJogging ? "conveyor_release_jog" : "conveyor_hold_jog";
         }
         else
         {
-            line = motion.IsRunning
-                ? "Tap STOP to stop the belt safely"
-                : "Tap START to run the belt";
+            narrationId = motion.IsRunning ? "conveyor_tap_stop" : "conveyor_tap_start";
         }
 
-        return line + GetStatusSuffix(motion);
+        return LocalizationManager.Get(narrationId) + GetStatusSuffix(motion);
     }
 
     private string GetStatusSuffix(ConveyorMotionController motion)
@@ -92,12 +117,22 @@ public class ConveyorInstructionsUI : MonoBehaviour
         string suffix = string.Empty;
         if (speedDial != null)
         {
-            suffix += $"  •  Speed: {speedDial.CurrentPreset}";
+            suffix += "  •  " + LocalizationManager.Get("conveyor_speed_format", LocalizationManager.Get(SpeedKey(speedDial.CurrentPreset)));
         }
         if (motion.Mode == ConveyorMotionController.OperatingMode.Manual)
         {
-            suffix += "  •  Mode: MANUAL";
+            suffix += "  •  " + LocalizationManager.Get("conveyor_mode_manual");
         }
         return suffix;
+    }
+
+    private static string SpeedKey(ConveyorSpeedDialController.SpeedPreset preset)
+    {
+        switch (preset)
+        {
+            case ConveyorSpeedDialController.SpeedPreset.Slow: return "conveyor_speed_slow";
+            case ConveyorSpeedDialController.SpeedPreset.Fast: return "conveyor_speed_fast";
+            default: return "conveyor_speed_normal";
+        }
     }
 }

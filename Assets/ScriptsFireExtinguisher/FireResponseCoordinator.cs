@@ -200,6 +200,11 @@ public class FireResponseCoordinator : MonoBehaviour
         OnModuleComplete?.Invoke(result);
     }
 
+    /// <summary>
+    /// Scenario tag is "&lt;scene&gt;/&lt;fire class&gt;/&lt;scenario&gt;", e.g. "FireTraining/BC/furnace" --
+    /// three scenarios share class BC, so the class alone can't tell the admin dashboard which
+    /// one was trained. (Older records have only "&lt;scene&gt;/&lt;fire class&gt;"; the dashboard reads both.)
+    /// </summary>
     private void RecordProgress(FireResponseResult result)
     {
         string scenario = gameObject.scene.name;
@@ -207,6 +212,12 @@ public class FireResponseCoordinator : MonoBehaviour
         if (fire != null)
         {
             scenario += "/" + fire.fireClass;
+            const string prefix = "scenario_";
+            string id = fire.scenarioNarrationId ?? string.Empty;
+            if (id.StartsWith(prefix))
+            {
+                scenario += "/" + id.Substring(prefix.Length);
+            }
         }
         ProgressStore.Record("fire_safety", scenario, result.passed, result.score, result.elapsedSeconds, JsonUtility.ToJson(result));
     }

@@ -9,7 +9,14 @@ using UnityEngine.UI;
 /// scenario left to train, a NEXT button also appears — clicking it moves straight on to
 /// the next scenario (see ARPlacementController.AdvanceToNextScenario) instead of ending
 /// the session; NEXT only disappears once every scenario has been trained, at which point
-/// Retry/Back/Certificate are the session's final actions.
+/// Retry/Back are the session's final actions. Before those final actions are revealed, the
+/// fire safety quiz (finalQuiz) runs once as the campaign's closing step.
+///
+/// Passing the quiz is mandatory: with a quiz wired up, the training only counts as passed on
+/// the final scenario, when that scenario was passed AND the quiz was passed. The certificate
+/// has no button of its own -- it opens automatically at that point (see RevealPanel). Closing
+/// or failing the quiz shows the final result as FAIL with no certificate; retrying the last
+/// scenario brings the quiz back.
 /// </summary>
 public class TrainingResultsUI : MonoBehaviour
 {
@@ -37,11 +44,21 @@ public class TrainingResultsUI : MonoBehaviour
     [Tooltip("Moves on to the next scenario in the campaign. Shown only while a scenario is still left to train.")]
     [SerializeField] private Button nextButton;
 
-    [Tooltip("Opens the QR-based certificate panel. Only shown on a PASS result.")]
-    [SerializeField] private Button getCertificateButton;
+    [Tooltip("QR certificate panel, opened automatically once the whole training (final scenario + quiz) is passed.")]
     [SerializeField] private CertificateUI certificateUI;
 
+    [Tooltip("Quiz run after the campaign's final scenario, before this panel reveals its final " +
+        "Retry/Certificate/Menu actions. Passing it is required for the certificate. Skipped once it " +
+        "has been passed this session. Leave unset to skip the quiz (certificate then follows the scenario result alone).")]
+    [SerializeField] private TrainingQuizUI finalQuiz;
+
+    [Tooltip("Quiz outcome line on the final result (passed with score / not passed, no certificate). Hidden mid-campaign.")]
+    [SerializeField] private TMP_Text quizStatusText;
+
     private FireResponseResult lastResult;
+    private bool lastHasNext;
+    private string lastScenarioTag = string.Empty;
+    private bool quizPending;
 
     private const string Pass = "✓";
     private const string Fail = "✗";
@@ -69,7 +86,6 @@ public class TrainingResultsUI : MonoBehaviour
         retryButton?.onClick.AddListener(HandleRetry);
         backToMenuButton?.onClick.AddListener(HandleBackToMenu);
         nextButton?.onClick.AddListener(HandleNext);
-        getCertificateButton?.onClick.AddListener(HandleGetCertificate);
     }
 
     /// <summary>
@@ -106,12 +122,22 @@ public class TrainingResultsUI : MonoBehaviour
         retryButton?.onClick.RemoveListener(HandleRetry);
         backToMenuButton?.onClick.RemoveListener(HandleBackToMenu);
         nextButton?.onClick.RemoveListener(HandleNext);
-        getCertificateButton?.onClick.RemoveListener(HandleGetCertificate);
+        if (finalQuiz != null)
+        {
+            finalQuiz.OnClosed -= HandleQuizClosed;
+        }
     }
 
     private void ShowResult(FireResponseResult result)
     {
         lastResult = result;
+
+        var placementController = FindFirstObjectByType<ARPlacementController>();
+        bool hasNext = placementController != null && placementController.HasNextScenario;
+
+        // Last scenario of the campaign just finished: every fire-safety module is done, so
+        // the quiz runs before this panel's final actions (see RevealPanel).
+        quizPending = !hasNext && finalQuiz != null && !finalQuiz.HasPassed;
 
         // Content is populated immediately either way; only the reveal is deferred when a
         // fronting modal is wired up, so this panel never overlaps it (see resultsModal doc).
@@ -129,34 +155,56 @@ public class TrainingResultsUI : MonoBehaviour
             result.forcedFailure ? LocalizationManager.Get("line_extinguisher_procedure") : LocalizationManager.Get("line_extinguisher_correct"),
             result.forcedFailure ? false : !result.wrongExtinguisherUsed);
 
-        var placementController = FindFirstObjectByType<ARPlacementController>();
-        string scenarioTag = placementController != null
+        lastHasNext = hasNext;
+        lastScenarioTag = placementController != null
             ? LocalizationManager.Get("scenario_tag_format", placementController.ScenarioNumber, placementController.TotalScenarios)
             : string.Empty;
 
-        if (overallResultText != null)
-        {
-            overallResultText.text = result.passed
-                ? LocalizationManager.Get("overall_pass_format", result.elapsedSeconds.ToString("0.0"), result.score, scenarioTag)
-                : LocalizationManager.Get("overall_fail_format", result.score, scenarioTag);
-            overallResultText.color = result.passed ? PassColor : FailColor;
-        }
-
-        bool hasNext = placementController != null && placementController.HasNextScenario;
         if (nextButton != null)
         {
             nextButton.gameObject.SetActive(hasNext);
         }
 
-        if (getCertificateButton != null)
-        {
-            getCertificateButton.gameObject.SetActive(result.passed);
-        }
+        RefreshOutcome();
     }
 
-    private void HandleGetCertificate()
+    /// <summary>
+    /// True once the whole training is complete and passed: the campaign's final scenario was
+    /// passed and (when a quiz is wired up) the quiz was passed. Gates the certificate.
+    /// </summary>
+    private bool TrainingPassed => !lastHasNext && lastResult.passed && (finalQuiz == null || finalQuiz.HasPassed);
+
+    /// <summary>
+    /// Overall PASS/FAIL line and quiz status line. Run when the scenario result arrives and
+    /// again after the quiz closes, since on the final scenario both depend on the quiz outcome.
+    /// </summary>
+    private void RefreshOutcome()
     {
-        certificateUI?.Show(LocalizationManager.Get("module_fire_safety_training"), lastResult.score);
+        bool quizRequired = finalQuiz != null;
+        bool finalScenario = !lastHasNext;
+
+        // Mid-campaign results stay per-scenario; the final result is the training outcome.
+        bool passed = finalScenario ? TrainingPassed : lastResult.passed;
+
+        if (overallResultText != null)
+        {
+            overallResultText.text = passed
+                ? LocalizationManager.Get("overall_pass_format", lastResult.elapsedSeconds.ToString("0.0"), lastResult.score, lastScenarioTag)
+                : LocalizationManager.Get("overall_fail_format", lastResult.score, lastScenarioTag);
+            overallResultText.color = passed ? PassColor : FailColor;
+        }
+
+        if (quizStatusText != null)
+        {
+            bool show = quizRequired && finalScenario;
+            quizStatusText.gameObject.SetActive(show);
+            if (show)
+            {
+                quizStatusText.text = finalQuiz.HasPassed
+                    ? $"<color=#2E7D32>{Pass}</color> " + LocalizationManager.Get("quiz_status_passed_format", finalQuiz.BestScore, finalQuiz.QuestionCount)
+                    : $"<color=#C62828>{Fail}</color> " + LocalizationManager.Get("quiz_status_not_passed");
+            }
+        }
     }
 
     private static void SetLine(TMP_Text label, string text, bool ok)
@@ -173,13 +221,36 @@ public class TrainingResultsUI : MonoBehaviour
     /// <summary>
     /// Activates panelRoot. Called either immediately from ShowResult (no fronting modal
     /// wired up) or from resultsModal.OnDismissed once the player closes the GREAT JOB modal.
+    /// After the campaign's final scenario, runs the quiz first and reveals the panel when
+    /// the quiz is closed; if the training is then passed, the certificate opens on top.
     /// </summary>
     private void RevealPanel()
     {
+        if (quizPending)
+        {
+            quizPending = false;
+            finalQuiz.OnClosed -= HandleQuizClosed;
+            finalQuiz.OnClosed += HandleQuizClosed;
+            finalQuiz.Show();
+            return;
+        }
+
         if (panelRoot != null)
         {
             panelRoot.SetActive(true);
         }
+
+        if (TrainingPassed)
+        {
+            certificateUI?.ShowAndGenerate(LocalizationManager.Get("module_fire_safety_training"), lastResult.score);
+        }
+    }
+
+    private void HandleQuizClosed()
+    {
+        finalQuiz.OnClosed -= HandleQuizClosed;
+        RefreshOutcome();
+        RevealPanel();
     }
 
     private void HandleRetry()

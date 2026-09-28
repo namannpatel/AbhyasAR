@@ -262,7 +262,7 @@ $$;
 -- Admins read attempts directly (the dashboard filters by worker_id).
 grant select on public.training_attempts to authenticated;
 create policy "admins read attempts" on public.training_attempts
-    for select to authenticated using (public.is_admin());
+    for select to authenticated using ((select public.is_admin()));
 
 -- ---------------------------------------------------------------- function grants
 

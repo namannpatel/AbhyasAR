@@ -3,10 +3,14 @@ using UnityEngine;
 
 /// <summary>
 /// Plays pre-generated Sarvam AI narration clips (see Assets/Audio/Narration/manifest.json)
-/// keyed by a stable narration id. Each clip's own asset name IS its id (e.g.
-/// "pass_pull_pin.wav" -> "pass_pull_pin"), so wiring this component is just dragging every
-/// clip from that folder into narrationClips -- no per-id inspector fields to keep in sync
-/// as lines get added or renamed.
+/// keyed by a stable narration id, in the app's active language. Each clip's own asset name IS
+/// its id: English clips are "&lt;id&gt;" (e.g. "pass_pull_pin.wav"), other languages carry a
+/// suffix, "&lt;id&gt;__&lt;lang&gt;" (e.g. "hi/pass_pull_pin__hi.wav"). So wiring this component is
+/// just dragging every clip from that folder into narrationClips -- no per-id inspector fields
+/// to keep in sync as lines get added or renamed.
+///
+/// Lookup order: the active language, then its voice fallback (Santali -> Hindi by default,
+/// since Sarvam has no Santali voice), then English.
 ///
 /// Generated entirely offline, ahead of time, by a one-off dev-time script (not shipped in
 /// the app) that hit the Sarvam AI REST API once per line and saved the returned audio --
@@ -18,6 +22,11 @@ public class NarrationPlayer : MonoBehaviour
 {
     [Tooltip("Drag every clip from Assets/Audio/Narration/ here -- looked up by clip.name, which matches each line's narration id (see manifest.json).")]
     [SerializeField] private AudioClip[] narrationClips;
+
+    [Tooltip("Narration language used for Santali, which has no recorded voice of its own (Sarvam TTS doesn't support it). Leave empty to fall straight back to English.")]
+    [SerializeField] private string santaliVoiceFallback = LocalizationManager.Hindi;
+
+    private const string LanguageSeparator = "__";
 
     private AudioSource audioSource;
     private Dictionary<string, AudioClip> clipsById;
@@ -63,7 +72,8 @@ public class NarrationPlayer : MonoBehaviour
         {
             return;
         }
-        if (!clipsById.TryGetValue(id, out AudioClip clip) || clip == null)
+        AudioClip clip = FindClip(id);
+        if (clip == null)
         {
             return;
         }
@@ -72,6 +82,31 @@ public class NarrationPlayer : MonoBehaviour
         audioSource.Stop();
         audioSource.clip = clip;
         audioSource.Play();
+    }
+
+    /// <summary>The clip for this id in the active language, its voice fallback, or English -- null if none is recorded.</summary>
+    private AudioClip FindClip(string id)
+    {
+        string language = LocalizationManager.CurrentLanguage;
+        if (language != LocalizationManager.English)
+        {
+            if (TryGet(id + LanguageSeparator + language, out AudioClip localized))
+            {
+                return localized;
+            }
+            if (language == LocalizationManager.Santali && !string.IsNullOrEmpty(santaliVoiceFallback)
+                && santaliVoiceFallback != LocalizationManager.English
+                && TryGet(id + LanguageSeparator + santaliVoiceFallback, out AudioClip fallback))
+            {
+                return fallback;
+            }
+        }
+        return TryGet(id, out AudioClip english) ? english : null;
+    }
+
+    private bool TryGet(string clipName, out AudioClip clip)
+    {
+        return clipsById.TryGetValue(clipName, out clip) && clip != null;
     }
 
     /// <summary>Stops narration immediately and clears the "already playing" guard.</summary>

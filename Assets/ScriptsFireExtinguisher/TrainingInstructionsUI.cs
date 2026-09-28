@@ -225,6 +225,17 @@ public class TrainingInstructionsUI : MonoBehaviour
             return LocalizationManager.Get(narrationId);
         }
 
+        // Gas furnace scenario: putting the fire out with the gas still on makes the furnace
+        // explode (FurnaceExplosionController), so shutting the valve comes before -- and, if
+        // the trainee skipped it, interrupts -- choosing and using an extinguisher.
+        var gasValve = fire.GetComponentInChildren<GasShutoffValve>();
+        var burningFire = fire.GetComponent<FireSource>();
+        if (gasValve != null && !gasValve.IsShutOff && (burningFire == null || !burningFire.IsExtinguished))
+        {
+            narrationId = "prompt_shut_gas";
+            return LocalizationManager.Get(narrationId);
+        }
+
         GameObject extinguisher = placementController.ChosenExtinguisher;
         if (extinguisher == null)
         {

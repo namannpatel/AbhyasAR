@@ -84,3 +84,14 @@ crashlytics-build.properties
 
 # Claude Code's own local session/tool state -- not project source.
 .claude/
+
+# Agent skills installed by `npx skills add` -- reinstallable from skills-lock.json.
+.agents/
+
+# Python bytecode from the Tools/ scripts.
+__pycache__/
+*.py[cod]
+
+# Supabase CLI local state (linked project ref, cached versions, local branches).
+supabase/.temp/
+supabase/.branches/

@@ -22,10 +22,14 @@ public class CertificateUI : MonoBehaviour
 
     private string moduleName;
     private int score;
+    private bool showing;
 
     private void Awake()
     {
-        if (panelRoot != null)
+        // This script lives on panelRoot itself, which is saved inactive -- so Awake first runs
+        // during Show()'s SetActive(true). Hiding unconditionally here undid that first Show(),
+        // so the first "Get Certificate" tap appeared to do nothing.
+        if (panelRoot != null && !showing)
         {
             panelRoot.SetActive(false);
         }
@@ -63,7 +67,9 @@ public class CertificateUI : MonoBehaviour
 
         if (panelRoot != null)
         {
+            showing = true;
             panelRoot.SetActive(true);
+            showing = false;
         }
         if (qrImage != null)
         {
@@ -72,6 +78,21 @@ public class CertificateUI : MonoBehaviour
         if (detailsText != null)
         {
             detailsText.text = LocalizationManager.Get("cert_enter_name_prompt");
+        }
+    }
+
+    /// <summary>
+    /// Opens the panel and, when the trainee's name is already known (logged-in worker, or the
+    /// name used last time on this device), generates the certificate straight away -- used when
+    /// a training is completed, so there's no separate "Get Certificate" step. With no known name
+    /// the panel just waits for one, same as Show().
+    /// </summary>
+    public void ShowAndGenerate(string forModuleName, int forScore)
+    {
+        Show(forModuleName, forScore);
+        if (nameInput != null && !string.IsNullOrWhiteSpace(nameInput.text))
+        {
+            HandleGenerate();
         }
     }
 
