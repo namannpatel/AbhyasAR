@@ -12,6 +12,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8c401a4d2d30a7e4384d6c0b1b3096e2, type: 3}
   m_Name: SupabaseConfig
   m_EditorClassIdentifier: Assembly-CSharp::SupabaseConfig
-  projectUrl: 
-  anonKey: 
+  projectUrl: https://vzwhnkosrxhtouggpmup.supabase.co
+  anonKey: sb_publishable_4XnH97QgBXQ4wB8In2s2vg_cOTihUAI
   requestTimeoutSeconds: 15

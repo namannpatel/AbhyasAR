@@ -47,7 +47,12 @@ public static class SupabaseRpc
         };
         request.SetRequestHeader("Content-Type", "application/json");
         request.SetRequestHeader("apikey", config.anonKey);
-        request.SetRequestHeader("Authorization", "Bearer " + config.anonKey);
+        // Publishable keys identify the app via apikey; they are not user JWTs.
+        // Preserve the legacy anon JWT header for older project configurations.
+        if (!config.anonKey.StartsWith("sb_publishable_", StringComparison.Ordinal))
+        {
+            request.SetRequestHeader("Authorization", "Bearer " + config.anonKey);
+        }
 
         yield return request.SendWebRequest();
 
