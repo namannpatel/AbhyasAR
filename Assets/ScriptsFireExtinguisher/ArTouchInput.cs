@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 /// <summary>
 /// Shared touch/mouse-fallback helpers for every script in this module that raycasts
@@ -8,22 +11,28 @@ using UnityEngine.EventSystems;
 /// instead of several drifting copies, and so the UI-pointer guard below only needs to be
 /// added once: without it, tapping the on-screen instructions/HUD/Retry button also
 /// registers as a world tap and can misfire whichever stage is currently listening.
+/// Uses the Input System package: AR Foundation's TrackedPoseDriver needs it, and Android
+/// builds refuse "Both" as the active input handling.
 /// </summary>
 public static class ArTouchInput
 {
+    private static readonly List<RaycastResult> UiHits = new List<RaycastResult>();
+
     /// <summary>True on the frame a touch/click begins, with its screen position — false if the tap started over UI.</summary>
     public static bool TryGetTapPosition(out Vector2 screenPos)
     {
-        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+        var touch = Touchscreen.current?.primaryTouch;
+        if (touch != null && touch.press.wasPressedThisFrame)
         {
-            screenPos = Input.GetTouch(0).position;
-            return !IsOverUI(Input.GetTouch(0).fingerId);
+            screenPos = touch.position.ReadValue();
+            return !IsOverUI(screenPos);
         }
 
-        if (Input.GetMouseButtonDown(0))
+        var mouse = Mouse.current;
+        if (mouse != null && mouse.leftButton.wasPressedThisFrame)
         {
-            screenPos = Input.mousePosition;
-            return !IsOverUI();
+            screenPos = mouse.position.ReadValue();
+            return !IsOverUI(screenPos);
         }
 
         screenPos = default;
@@ -33,32 +42,43 @@ public static class ArTouchInput
     /// <summary>True on every frame a touch/click is currently down, with its screen position — false while held over UI.</summary>
     public static bool TryGetHeldPosition(out Vector2 screenPos)
     {
-        if (Input.touchCount > 0)
+        var touch = Touchscreen.current?.primaryTouch;
+        if (touch != null && touch.press.isPressed)
         {
-            Touch t = Input.GetTouch(0);
-            if (t.phase == TouchPhase.Began || t.phase == TouchPhase.Moved || t.phase == TouchPhase.Stationary)
-            {
-                screenPos = t.position;
-                return !IsOverUI(t.fingerId);
-            }
+            screenPos = touch.position.ReadValue();
+            return !IsOverUI(screenPos);
         }
-        else if (Input.GetMouseButton(0))
+
+        var mouse = Mouse.current;
+        if (mouse != null && mouse.leftButton.isPressed)
         {
-            screenPos = Input.mousePosition;
-            return !IsOverUI();
+            screenPos = mouse.position.ReadValue();
+            return !IsOverUI(screenPos);
         }
 
         screenPos = default;
         return false;
     }
 
-    private static bool IsOverUI(int fingerId)
+    // Raycasts the UI directly instead of IsPointerOverGameObject, which with the Input System
+    // UI module reports the previous frame's pointer state on the frame a touch begins.
+    private static bool IsOverUI(Vector2 screenPos)
     {
-        return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject(fingerId);
-    }
+        var eventSystem = EventSystem.current;
+        if (eventSystem == null)
+        {
+            return false;
+        }
 
-    private static bool IsOverUI()
-    {
-        return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        UiHits.Clear();
+        eventSystem.RaycastAll(new PointerEventData(eventSystem) { position = screenPos }, UiHits);
+        foreach (var hit in UiHits)
+        {
+            if (hit.module is GraphicRaycaster)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }

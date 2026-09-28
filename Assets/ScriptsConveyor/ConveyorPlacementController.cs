@@ -21,9 +21,13 @@ public class ConveyorPlacementController : MonoBehaviour
     [Tooltip("Creates the ARAnchor the conveyor is attached to, so it doesn't drift as AR tracking refines. Auto-found on this GameObject if left empty.")]
     [SerializeField] private ARAnchorManager anchorManager;
 
+    [Tooltip("Uniform scale applied to the placed conveyor (the prefab at 1.0 is ~2.5m long and ~2m tall).")]
+    [SerializeField] private float placedScale = 0.8f;
+
     private ARRaycastManager raycastManager;
     private readonly List<ARRaycastHit> hits = new List<ARRaycastHit>();
     private float placedAtTime;
+    private bool planesVisible = true;
 
     public GameObject PlacedConveyor { get; private set; }
     public ConveyorMotionController MotionController { get; private set; }
@@ -37,6 +41,19 @@ public class ConveyorPlacementController : MonoBehaviour
         if (anchorManager == null)
         {
             anchorManager = GetComponent<ARAnchorManager>();
+        }
+
+        if (planeManager != null)
+        {
+            planeManager.trackablesChanged.AddListener(HandlePlanesChanged);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (planeManager != null)
+        {
+            planeManager.trackablesChanged.RemoveListener(HandlePlanesChanged);
         }
     }
 
@@ -115,6 +132,7 @@ public class ConveyorPlacementController : MonoBehaviour
         PlacedConveyor = Instantiate(conveyorPrefab, Vector3.zero, Quaternion.identity, anchor);
         PlacedConveyor.transform.localPosition = Vector3.zero;
         PlacedConveyor.transform.localRotation = Quaternion.identity;
+        PlacedConveyor.transform.localScale = Vector3.one * placedScale;
 
         MotionController = PlacedConveyor.GetComponentInChildren<ConveyorMotionController>(true);
         placedAtTime = Time.time;
@@ -140,8 +158,11 @@ public class ConveyorPlacementController : MonoBehaviour
         SetPlanesVisible(true);
     }
 
+    // Hides the overlay only; planeManager stays enabled (see ARPlacementController.SetPlanesVisible).
     private void SetPlanesVisible(bool visible)
     {
+        planesVisible = visible;
+
         if (planeManager == null)
         {
             return;
@@ -150,6 +171,20 @@ public class ConveyorPlacementController : MonoBehaviour
         foreach (var plane in planeManager.trackables)
         {
             plane.gameObject.SetActive(visible);
+        }
+    }
+
+    /// <summary>Keeps planes detected after placement hidden too, so the overlay doesn't reappear around the conveyor.</summary>
+    private void HandlePlanesChanged(ARTrackablesChangedEventArgs<ARPlane> args)
+    {
+        if (planesVisible)
+        {
+            return;
+        }
+
+        foreach (var plane in args.added)
+        {
+            plane.gameObject.SetActive(false);
         }
     }
 }

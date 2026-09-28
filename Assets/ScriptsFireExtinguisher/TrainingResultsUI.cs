@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,11 +13,11 @@ using UnityEngine.UI;
 /// Retry/Back are the session's final actions. Before those final actions are revealed, the
 /// fire safety quiz (finalQuiz) runs once as the campaign's closing step.
 ///
-/// Passing the quiz is mandatory: with a quiz wired up, the training only counts as passed on
-/// the final scenario, when that scenario was passed AND the quiz was passed. The certificate
-/// has no button of its own -- it opens automatically at that point (see RevealPanel). Closing
-/// or failing the quiz shows the final result as FAIL with no certificate; retrying the last
-/// scenario brings the quiz back.
+/// The final mark follows <see cref="TrainingScoring"/>: the practice score (the average of each
+/// scenario's latest score) counts 40% and the quiz 60%, and the training passes at 80/100. The
+/// certificate has no button of its own -- it opens automatically once that total is reached
+/// (see RevealPanel). Below it, the final result is FAIL with no certificate; retrying the last
+/// scenario brings the quiz back unless the best quiz score already reaches the pass mark.
 /// </summary>
 public class TrainingResultsUI : MonoBehaviour
 {
@@ -59,6 +60,9 @@ public class TrainingResultsUI : MonoBehaviour
     private bool lastHasNext;
     private string lastScenarioTag = string.Empty;
     private bool quizPending;
+
+    // Latest score per campaign scenario number; a retried scenario overwrites its entry.
+    private readonly Dictionary<int, int> scenarioScores = new Dictionary<int, int>();
 
     private const string Pass = "✓";
     private const string Fail = "✗";
@@ -134,10 +138,12 @@ public class TrainingResultsUI : MonoBehaviour
 
         var placementController = FindFirstObjectByType<ARPlacementController>();
         bool hasNext = placementController != null && placementController.HasNextScenario;
+        scenarioScores[placementController != null ? placementController.ScenarioNumber : 0] = result.score;
 
         // Last scenario of the campaign just finished: every fire-safety module is done, so
-        // the quiz runs before this panel's final actions (see RevealPanel).
-        quizPending = !hasNext && finalQuiz != null && !finalQuiz.HasPassed;
+        // the quiz runs before this panel's final actions (see RevealPanel) -- unless the best
+        // quiz score this session already brings the total to the pass mark.
+        quizPending = !hasNext && finalQuiz != null && !TrainingScoring.IsPass(PracticePercent, finalQuiz.BestPercent);
 
         // Content is populated immediately either way; only the reveal is deferred when a
         // fronting modal is wired up, so this panel never overlaps it (see resultsModal doc).
@@ -168,11 +174,31 @@ public class TrainingResultsUI : MonoBehaviour
         RefreshOutcome();
     }
 
-    /// <summary>
-    /// True once the whole training is complete and passed: the campaign's final scenario was
-    /// passed and (when a quiz is wired up) the quiz was passed. Gates the certificate.
-    /// </summary>
-    private bool TrainingPassed => !lastHasNext && lastResult.passed && (finalQuiz == null || finalQuiz.HasPassed);
+    /// <summary>Practice part of the final mark: the average of each scenario's latest score.</summary>
+    private int PracticePercent
+    {
+        get
+        {
+            if (scenarioScores.Count == 0)
+            {
+                return 0;
+            }
+            int sum = 0;
+            foreach (int s in scenarioScores.Values)
+            {
+                sum += s;
+            }
+            return Mathf.RoundToInt((float)sum / scenarioScores.Count);
+        }
+    }
+
+    /// <summary>Weighted practice + quiz total (practice alone when no quiz is wired up).</summary>
+    private int TotalScore => finalQuiz != null
+        ? TrainingScoring.Total(PracticePercent, finalQuiz.BestPercent)
+        : PracticePercent;
+
+    /// <summary>True once the whole campaign is done and the total reaches the pass mark. Gates the certificate.</summary>
+    private bool TrainingPassed => !lastHasNext && TotalScore >= TrainingScoring.PassMark;
 
     /// <summary>
     /// Overall PASS/FAIL line and quiz status line. Run when the scenario result arrives and
@@ -183,14 +209,15 @@ public class TrainingResultsUI : MonoBehaviour
         bool quizRequired = finalQuiz != null;
         bool finalScenario = !lastHasNext;
 
-        // Mid-campaign results stay per-scenario; the final result is the training outcome.
+        // Mid-campaign results stay per-scenario; the final result is the weighted training outcome.
         bool passed = finalScenario ? TrainingPassed : lastResult.passed;
+        int shownScore = finalScenario ? TotalScore : lastResult.score;
 
         if (overallResultText != null)
         {
             overallResultText.text = passed
-                ? LocalizationManager.Get("overall_pass_format", lastResult.elapsedSeconds.ToString("0.0"), lastResult.score, lastScenarioTag)
-                : LocalizationManager.Get("overall_fail_format", lastResult.score, lastScenarioTag);
+                ? LocalizationManager.Get("overall_pass_format", lastResult.elapsedSeconds.ToString("0.0"), shownScore, lastScenarioTag)
+                : LocalizationManager.Get("overall_fail_format", shownScore, lastScenarioTag);
             overallResultText.color = passed ? PassColor : FailColor;
         }
 
@@ -200,9 +227,9 @@ public class TrainingResultsUI : MonoBehaviour
             quizStatusText.gameObject.SetActive(show);
             if (show)
             {
-                quizStatusText.text = finalQuiz.HasPassed
-                    ? $"<color=#2E7D32>{Pass}</color> " + LocalizationManager.Get("quiz_status_passed_format", finalQuiz.BestScore, finalQuiz.QuestionCount)
-                    : $"<color=#C62828>{Fail}</color> " + LocalizationManager.Get("quiz_status_not_passed");
+                string glyph = passed ? $"<color=#2E7D32>{Pass}</color> " : $"<color=#C62828>{Fail}</color> ";
+                quizStatusText.text = glyph + LocalizationManager.Get("score_breakdown_format",
+                    PracticePercent, finalQuiz.BestPercent, TotalScore, TrainingScoring.PassMark);
             }
         }
     }
@@ -231,6 +258,7 @@ public class TrainingResultsUI : MonoBehaviour
             quizPending = false;
             finalQuiz.OnClosed -= HandleQuizClosed;
             finalQuiz.OnClosed += HandleQuizClosed;
+            finalQuiz.SetPracticePercent(PracticePercent);
             finalQuiz.Show();
             return;
         }
@@ -242,7 +270,7 @@ public class TrainingResultsUI : MonoBehaviour
 
         if (TrainingPassed)
         {
-            certificateUI?.ShowAndGenerate(LocalizationManager.Get("module_fire_safety_training"), lastResult.score);
+            certificateUI?.ShowAndGenerate(LocalizationManager.Get("module_fire_safety_training"), TotalScore);
         }
     }
 

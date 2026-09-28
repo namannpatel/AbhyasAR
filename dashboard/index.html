@@ -4,47 +4,64 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SurakshaAR Admin</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d9480f'/%3E%3Cpath d='M16 6l8 3v6c0 5-3.4 9-8 11-4.6-2-8-6-8-11V9z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23FFD20A'/%3E%3Cpath d='M16 5l9 3.4v6.4c0 5.6-3.8 10-9 12.2-5.2-2.2-9-6.6-9-12.2V8.4z' fill='%2311110F'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..100,700..900&family=Geist+Mono:wght@400..600&family=Geist:wght@400..700&family=Noto+Sans+Devanagari:wght@400..700&display=swap">
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js"></script>
 </head>
-<body>
-  <header class="topbar">
-    <div class="brand">SurakshaAR <span>Admin</span></div>
-    <nav class="nav" id="nav" hidden>
-      <a href="#/overview" data-nav="overview">Overview</a>
-      <a href="#/workers" data-nav="workers">Workers</a>
-      <a href="#/certificates" data-nav="certificates">Certificates</a>
-      <a href="#/admins" data-nav="admins">Admins</a>
-    </nav>
-    <div class="topbar-right" id="session-box" hidden>
-      <button class="ghost small" id="refresh-btn" title="Reload data">Refresh</button>
-      <span id="admin-email"></span>
-      <button class="ghost small" id="signout-btn">Sign out</button>
+<body data-view="login">
+  <aside class="rail">
+    <a class="wordmark" href="#/overview" aria-label="SurakshaAR admin home"><span>SURAKSHA</span><b>AR</b></a>
+    <div class="rail-body">
+      <p class="rail-kicker">Field safety training<br>Admin console</p>
+      <nav class="nav" id="nav" hidden>
+        <a href="#/overview" data-nav="overview"><i>01</i>Overview</a>
+        <a href="#/workers" data-nav="workers"><i>02</i>Workers</a>
+        <a href="#/certificates" data-nav="certificates"><i>03</i>Certificates</a>
+        <a href="#/admins" data-nav="admins"><i>04</i>Admins</a>
+      </nav>
+      <div class="session" id="session-box" hidden>
+        <span class="session-label">Signed in</span>
+        <span id="admin-email"></span>
+        <div class="session-actions">
+          <button class="ghost small" id="refresh-btn" title="Reload data from Supabase">Refresh</button>
+          <button class="ghost small" id="signout-btn">Sign out</button>
+        </div>
+      </div>
     </div>
-  </header>
+  </aside>
 
   <main id="main">
     <!-- Sign in -->
-    <section id="view-login" class="view" hidden>
-      <form id="login-form" class="card narrow">
-        <h1>Admin sign in</h1>
+    <section id="view-login" class="view login" hidden>
+      <div class="login-art" aria-hidden="true">
+        <span class="login-word">SURAK<br>SHA</span>
+        <span class="login-ar">AR</span>
+        <div class="hazard-band"></div>
+      </div>
+      <form id="login-form" class="login-form">
+        <p class="kicker">Admin console · restricted</p>
+        <h1>Sign in</h1>
+        <p class="muted">Worker logins, synced training results and certificates for SurakshaAR fire and machinery training.</p>
         <label>Email <input type="email" id="login-email" required autocomplete="username"></label>
         <label>Password <input type="password" id="login-password" required autocomplete="current-password"></label>
-        <button type="submit" class="primary">Sign in</button>
+        <button type="submit" class="primary">Sign in →</button>
         <p class="error" id="login-error"></p>
       </form>
     </section>
 
     <!-- Overview -->
     <section id="view-overview" class="view" hidden>
-      <div class="view-head">
-        <div>
-          <h1>Overview</h1>
-          <p class="muted" id="overview-caption"></p>
+      <header class="view-head">
+        <div class="headline"><span class="index">01</span><h1>Overview</h1></div>
+        <div class="head-meta">
+          <p class="mono-meta" id="overview-caption"></p>
+          <p class="rule-note">Pass = practice × 40% + quiz × 60% ≥ 80</p>
         </div>
-      </div>
+      </header>
       <div class="filters">
         <label class="inline">Period
           <select id="f-range">
@@ -69,13 +86,16 @@
 
     <!-- Workers list -->
     <section id="view-workers" class="view" hidden>
-      <div class="view-head">
-        <h1>Workers</h1>
-        <div class="actions">
-          <button class="ghost" id="export-workers-btn">Export CSV</button>
-          <button class="primary" id="new-worker-btn">+ Add workers</button>
+      <header class="view-head">
+        <div class="headline"><span class="index">02</span><h1>Workers</h1></div>
+        <div class="head-meta">
+          <p class="mono-meta">Tap a row for a worker's scores, history and login controls.</p>
+          <div class="actions">
+            <button class="ghost" id="export-workers-btn">Export CSV</button>
+            <button class="primary" id="new-worker-btn">+ Add workers</button>
+          </div>
         </div>
-      </div>
+      </header>
       <div class="filters">
         <input type="search" id="worker-search" placeholder="Search name or worker ID" aria-label="Search workers">
         <label class="inline">Status
@@ -94,7 +114,7 @@
             <option value="none">Not certified yet</option>
           </select>
         </label>
-        <span class="muted" id="workers-count"></span>
+        <span class="count" id="workers-count"></span>
       </div>
       <div class="card table-wrap">
         <table class="sortable">
@@ -118,21 +138,21 @@
 
     <!-- Worker detail -->
     <section id="view-worker" class="view" hidden>
-      <a href="#/workers" class="back">&larr; All workers</a>
-      <div class="view-head">
-        <div>
-          <h1 id="worker-name"></h1>
-          <div class="muted" id="worker-meta"></div>
+      <a href="#/workers" class="back">← 02 Workers</a>
+      <header class="view-head worker-head">
+        <div class="headline"><h1 id="worker-name"></h1></div>
+        <div class="head-meta">
+          <div class="worker-meta" id="worker-meta"></div>
+          <div class="actions">
+            <button class="ghost" id="export-csv-btn">Export CSV</button>
+            <button class="ghost" id="rename-btn">Rename</button>
+            <button class="ghost" id="reset-pw-btn">Reset password</button>
+            <button class="ghost" id="toggle-active-btn"></button>
+            <button class="ghost danger" id="delete-btn">Delete</button>
+          </div>
         </div>
-        <div class="actions">
-          <button class="ghost" id="export-csv-btn">Export CSV</button>
-          <button class="ghost" id="rename-btn">Rename</button>
-          <button class="ghost" id="reset-pw-btn">Reset password</button>
-          <button class="ghost" id="toggle-active-btn"></button>
-          <button class="ghost danger" id="delete-btn">Delete</button>
-        </div>
-      </div>
-      <div class="grid-2" id="worker-modules"></div>
+      </header>
+      <div class="modules" id="worker-modules"></div>
       <div class="view-head sub">
         <h2>Training history</h2>
         <label class="inline">Training
@@ -150,24 +170,28 @@
           </thead>
           <tbody id="attempts-body"></tbody>
         </table>
-        <p class="empty" id="attempts-empty" hidden>No training attempts synced yet.</p>
+        <p class="empty" id="attempts-empty" hidden>No training attempts synced yet. Results appear after the worker's phone next goes online.</p>
       </div>
     </section>
 
     <!-- Certificates -->
     <section id="view-certificates" class="view" hidden>
-      <div class="view-head">
-        <div>
-          <h1>Certificates</h1>
-          <p class="muted">A training is passed when its practical part and its quiz are both passed.</p>
+      <header class="view-head">
+        <div class="headline"><span class="index">03</span><h1>Certificates</h1></div>
+        <div class="head-meta">
+          <p class="rule-note">Issued when practice × 40% + quiz × 60% reaches 80/100.</p>
+          <div class="actions"><button class="ghost" id="export-certs-btn">Export CSV</button></div>
         </div>
-        <button class="ghost" id="export-certs-btn">Export CSV</button>
-      </div>
-      <form class="card verify" id="verify-form">
-        <h2>Verify a certificate</h2>
-        <p class="muted">Scan the certificate's QR code and paste the text (it starts with <span class="mono">AR-CERT|</span>).</p>
-        <textarea id="verify-input" rows="2" required placeholder="AR-CERT|v1|…" spellcheck="false"></textarea>
-        <div class="dialog-actions left"><button type="submit" class="primary">Verify</button></div>
+      </header>
+      <form class="card verify offset" id="verify-form">
+        <div class="verify-head">
+          <h2>Verify a certificate</h2>
+          <p class="muted">Scan the QR code on the worker's certificate and paste the text. It starts with <span class="mono">AR-CERT|</span></p>
+        </div>
+        <div class="verify-row">
+          <textarea id="verify-input" rows="2" required placeholder="AR-CERT|v1|…" spellcheck="false"></textarea>
+          <button type="submit" class="primary">Verify</button>
+        </div>
         <div id="verify-result" aria-live="polite"></div>
       </form>
       <div class="filters">
@@ -178,12 +202,12 @@
             <option value="machine_training">Machinery Training</option>
           </select>
         </label>
-        <span class="muted" id="certs-count"></span>
+        <span class="count" id="certs-count"></span>
       </div>
       <div class="card table-wrap">
         <table>
           <thead>
-            <tr><th>Certified</th><th>Worker</th><th>Name</th><th>Training</th><th class="num">Best quiz</th><th>Status</th></tr>
+            <tr><th>Certified</th><th>Worker</th><th>Name</th><th>Training</th><th class="num">Score</th><th>Status</th></tr>
           </thead>
           <tbody id="certs-body"></tbody>
         </table>
@@ -193,22 +217,27 @@
 
     <!-- Admins -->
     <section id="view-admins" class="view" hidden>
-      <div class="view-head"><h1>Admins</h1></div>
-      <div class="card table-wrap">
-        <table>
-          <thead><tr><th>Email</th><th>Account created</th><th>Last sign-in</th><th></th></tr></thead>
-          <tbody id="admins-body"></tbody>
-        </table>
-      </div>
-      <form class="card add-admin" id="add-admin-form">
-        <h2>Give someone admin access</h2>
-        <p class="muted">First create their account in Supabase (<b>Authentication → Users → Add user</b>), then enter the same email here.</p>
-        <div class="row">
-          <input type="email" id="add-admin-email" required placeholder="name@example.com" aria-label="Admin email">
-          <button type="submit" class="primary">Add admin</button>
+      <header class="view-head">
+        <div class="headline"><span class="index">04</span><h1>Admins</h1></div>
+        <div class="head-meta"><p class="mono-meta">People who can sign in here, create worker logins and reset passwords.</p></div>
+      </header>
+      <div class="admins-layout">
+        <div class="card table-wrap">
+          <table>
+            <thead><tr><th>Email</th><th>Account created</th><th>Last sign-in</th><th></th></tr></thead>
+            <tbody id="admins-body"></tbody>
+          </table>
         </div>
-        <p class="error" id="add-admin-error"></p>
-      </form>
+        <form class="card add-admin offset" id="add-admin-form">
+          <h2>Grant admin access</h2>
+          <p class="muted">Create their account in Supabase first (<b>Authentication → Users → Add user</b>), then enter the same email.</p>
+          <div class="row">
+            <input type="email" id="add-admin-email" required placeholder="name@example.com" aria-label="Admin email">
+            <button type="submit" class="primary">Add admin</button>
+          </div>
+          <p class="error" id="add-admin-error"></p>
+        </form>
+      </div>
     </section>
   </main>
 
@@ -232,7 +261,7 @@
   <dialog id="credentials-dialog" class="wide">
     <div class="credentials printable">
       <h2 id="cred-title">Login details</h2>
-      <p class="muted no-print">Share these with each worker. <b>Passwords are shown only once</b> — print or copy them now.</p>
+      <p class="warning no-print">Passwords are shown once. Print or copy them now, then hand each worker their own line.</p>
       <div class="table-wrap">
         <table class="cred-table">
           <thead><tr><th>Name</th><th>Worker ID</th><th>Password</th></tr></thead>
@@ -261,7 +290,7 @@
   </dialog>
 
   <!-- Delete -->
-  <dialog id="delete-dialog">
+  <dialog id="delete-dialog" class="hazard">
     <form id="delete-form" method="dialog">
       <h2>Delete worker</h2>
       <p>This permanently deletes <b id="delete-name"></b> and <b>all their synced training records</b>. It can't be undone. To keep their records, disable their login instead.</p>

@@ -1,6 +1,5 @@
 {
   "app_title": "SurakshaAR",
-  "menu_tutorial": "Tutorial",
   "menu_fire_training": "Fire Training",
   "menu_machine_training": "Machine Training",
   "menu_options": "Options",
@@ -108,6 +107,8 @@
   "quiz_result_fail_title": "NOT QUITE — TRY AGAIN",
   "quiz_result_pass_format": "You scored {0}/{1}. Great job!",
   "quiz_result_fail_format": "You scored {0}/{1}. You need {2} to pass.",
+  "quiz_result_fail_practice_format": "You scored {0}/{1}. Your practice score is too low to reach the pass mark. Retry the practice.",
+  "score_breakdown_format": "Practice {0}/100 × 40% + Quiz {1}/100 × 60% = {2}/100 (pass: {3})",
   "quiz_q_identify_ext": "Identify this fire extinguisher. What type of fire is it used for?",
   "quiz_opt_class_a": "Class A: ordinary combustibles like wood, paper and cloth",
   "quiz_opt_class_bc": "Class BC: flammable liquids and electrical fires",

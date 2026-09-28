@@ -13,9 +13,13 @@ public class ComingSoonModal : MonoBehaviour
     [SerializeField] private TMP_Text messageText;
     [SerializeField] private Button closeButton;
 
+    private bool showing;
+
     private void Awake()
     {
-        if (modalRoot != null)
+        // This script lives on modalRoot, which is saved inactive, so Awake first runs during
+        // Show()'s SetActive(true) -- hiding unconditionally here undid the first tap.
+        if (modalRoot != null && !showing)
         {
             modalRoot.SetActive(false);
         }
@@ -35,7 +39,9 @@ public class ComingSoonModal : MonoBehaviour
     {
         if (modalRoot != null)
         {
+            showing = true;
             modalRoot.SetActive(true);
+            showing = false;
         }
         if (messageText != null)
         {

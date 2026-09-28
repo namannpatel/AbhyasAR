@@ -2,26 +2,18 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 /// <summary>
-/// Scene navigation for the training module. Wire MainMenu.unity's Canvas buttons
-/// (ButtonTutorial, ButtonPractica, ButtonCreditos, ButtonSalir, ButtonOpciones) to
-/// these methods via their OnClick() lists (Editor-only step — they're currently
-/// empty). Scene names must match Build Settings exactly.
+/// Scene navigation for the training modules, wired from MainMenu.unity's buttons' OnClick()
+/// lists and the in-AR toolbars. Scene names must match Build Settings exactly.
 /// </summary>
 public class MenuManager : MonoBehaviour
 {
     private const string LoginScene = "Login";
     private const string MainMenuScene = "MainMenu";
-    private const string TutorialScene = "Tutorial";
     private const string CreditsScene = "MainMenu"; // No dedicated credits scene yet; update if one is added.
 
     public void LoadMainMenu()
     {
         LoadScene(MainMenuScene);
-    }
-
-    public void LoadTutorial()
-    {
-        LoadScene(TutorialScene);
     }
 
     /// <summary>

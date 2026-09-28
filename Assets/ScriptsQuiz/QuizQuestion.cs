@@ -35,9 +35,6 @@ public enum QuizBank
 
 public static class QuizBanks
 {
-    /// <summary>Fraction of correct answers needed to pass any quiz.</summary>
-    public const float PassFraction = 0.7f;
-
     public static QuizQuestion[] Get(QuizBank bank)
     {
         switch (bank)

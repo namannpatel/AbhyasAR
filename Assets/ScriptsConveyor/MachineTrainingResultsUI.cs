@@ -10,11 +10,11 @@ using UnityEngine.UI;
 /// is recorded, and the machine-safety quiz runs. When the quiz closes, this results panel
 /// shows the practice checklist and the training outcome.
 ///
-/// Passing the quiz is mandatory: the training only counts as passed when the practice is done
-/// AND the quiz was passed -- and only then does the certificate open (automatically; there is
-/// no separate certificate button). Closing or failing the quiz shows NOT PASSED with no
-/// certificate; RETRY restarts the practice, after which the quiz runs again. A quiz already
-/// passed this session isn't asked again.
+/// The final mark follows <see cref="TrainingScoring"/>: the practice (share of controls
+/// practised) counts 40% and the quiz 60%, and the training passes at 80/100 -- only then does
+/// the certificate open (automatically; there is no separate certificate button). Below it, the
+/// result is NOT PASSED with no certificate; RETRY restarts the practice, after which the quiz
+/// runs again unless the best quiz score this session already reaches the pass mark.
 /// </summary>
 public class MachineTrainingResultsUI : MonoBehaviour
 {
@@ -45,12 +45,31 @@ public class MachineTrainingResultsUI : MonoBehaviour
         public int tasksCompleted;
     }
 
-    private bool TrainingPassed => tracker != null && tracker.IsComplete && (quiz == null || quiz.HasPassed);
+    /// <summary>Practice part of the final mark: the share of practice tasks completed.</summary>
+    private int PracticePercent
+    {
+        get
+        {
+            if (tracker == null || tracker.TaskCount == 0)
+            {
+                return 0;
+            }
+            int done = 0;
+            foreach (ConveyorTrainingTracker.Task task in Enum.GetValues(typeof(ConveyorTrainingTracker.Task)))
+            {
+                if (tracker.IsDone(task))
+                {
+                    done++;
+                }
+            }
+            return TrainingScoring.Percent(done, tracker.TaskCount);
+        }
+    }
 
-    /// <summary>Certificate score: the best quiz result as a percentage (the practice itself isn't scored).</summary>
-    private int CertificateScore => quiz != null && quiz.QuestionCount > 0
-        ? Mathf.RoundToInt(quiz.BestScore * 100f / quiz.QuestionCount)
-        : 100;
+    /// <summary>Weighted practice + quiz total (practice alone when no quiz is wired up). Also the certificate score.</summary>
+    private int TotalScore => quiz != null ? TrainingScoring.Total(PracticePercent, quiz.BestPercent) : PracticePercent;
+
+    private bool TrainingPassed => tracker != null && tracker.IsComplete && TotalScore >= TrainingScoring.PassMark;
 
     private void Awake()
     {
@@ -94,10 +113,11 @@ public class MachineTrainingResultsUI : MonoBehaviour
         ProgressStore.Record(ProgressModule, gameObject.scene.name + "/Practice", true, 100,
             tracker.CompletedElapsedSeconds, JsonUtility.ToJson(new PracticeDetails { tasksCompleted = tracker.TaskCount }));
 
-        if (quiz != null && !quiz.HasPassed)
+        if (quiz != null && !TrainingScoring.IsPass(PracticePercent, quiz.BestPercent))
         {
             quiz.OnClosed -= HandleQuizClosed;
             quiz.OnClosed += HandleQuizClosed;
+            quiz.SetPracticePercent(PracticePercent);
             quiz.Show();
             return;
         }
@@ -123,7 +143,7 @@ public class MachineTrainingResultsUI : MonoBehaviour
 
         if (TrainingPassed)
         {
-            certificateUI?.ShowAndGenerate(LocalizationManager.Get("module_machine_safety_training"), CertificateScore);
+            certificateUI?.ShowAndGenerate(LocalizationManager.Get("module_machine_safety_training"), TotalScore);
         }
     }
 
@@ -157,9 +177,8 @@ public class MachineTrainingResultsUI : MonoBehaviour
             quizStatusText.gameObject.SetActive(quiz != null);
             if (quiz != null)
             {
-                quizStatusText.text = quiz.HasPassed
-                    ? "<color=#2E7D32>✓</color> " + LocalizationManager.Get("machine_quiz_status_passed_format", quiz.BestScore, quiz.QuestionCount)
-                    : "<color=#C62828>✗</color> " + LocalizationManager.Get("machine_quiz_status_not_passed");
+                quizStatusText.text = (passed ? "<color=#2E7D32>✓</color> " : "<color=#C62828>✗</color> ")
+                    + LocalizationManager.Get("score_breakdown_format", PracticePercent, quiz.BestPercent, TotalScore, TrainingScoring.PassMark);
             }
         }
     }

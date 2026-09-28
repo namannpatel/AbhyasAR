@@ -1,4 +1,4 @@
-import { MODULES, MODULE_KEYS, FIRE_SCENARIOS, FIRE_STEPS, parseScenario, quizResult, certification,
+import { MODULES, MODULE_KEYS, FIRE_SCENARIOS, FIRE_STEPS, SCORING, quizPassMark, parseScenario, quizResult, certification,
          parseCertificate, checksumMatches, matchCertificate } from "./training.js";
 import { chartCard, columnChart, barList, meter } from "./charts.js";
 
@@ -71,11 +71,12 @@ function toast(message) {
   toast.timer = setTimeout(() => (t.hidden = true), 3200);
 }
 
-function tile(label, value, sub) {
-  return el("div", { class: "card tile" }, el("div", { class: "label" }, label), el("div", { class: "value" }, value), sub ? el("div", { class: "sub" }, sub) : null);
+function tile(label, value, sub, accent = false) {
+  return el("div", { class: accent ? "tile accent" : "tile" }, el("div", { class: "label" }, label), el("div", { class: "value" }, value), sub ? el("div", { class: "sub" }, sub) : null);
 }
 
 function showView(name) {
+  document.body.dataset.view = name;
   for (const v of document.querySelectorAll(".view")) v.hidden = v.id !== `view-${name}`;
   for (const a of document.querySelectorAll("[data-nav]")) a.classList.toggle("active", a.dataset.nav === name || (name === "worker" && a.dataset.nav === "workers"));
 }
@@ -191,7 +192,8 @@ function renderOverview() {
   const list = state.attempts.filter((a) => inModule(a.module) && Date.parse(a.completed_at) >= since);
   const modules = MODULE_KEYS.filter(inModule);
 
-  $("overview-caption").textContent = `${$("f-range").selectedOptions[0].text} · ${$("f-module").selectedOptions[0].text}`;
+  const syncedWorkers = new Set(list.map((a) => a.worker_id)).size;
+  $("overview-caption").textContent = `${list.length.toLocaleString()} attempts synced from ${syncedWorkers} worker${syncedWorkers === 1 ? "" : "s"} · ${$("f-range").selectedOptions[0].text.toLowerCase()} · ${$("f-module").selectedOptions[0].text.toLowerCase()}`;
 
   // ---- KPI row
   const activeWorkers = new Set(list.map((a) => a.worker_id)).size;
@@ -204,7 +206,7 @@ function renderOverview() {
     tile("Active workers", activeWorkers, `of ${state.workers.length} workers`),
     tile("Training attempts", list.length.toLocaleString(), `${passed.toLocaleString()} passed`),
     tile("Pass rate", pct(passed, list.length), "all attempts"),
-    tile("Certificates earned", certsEarned, "practical + quiz passed"),
+    tile("Certificates earned", certsEarned, `total ≥ ${SCORING.passMark}/100`, true),
     tile("Average quiz score", avgQuiz == null ? "—" : `${avgQuiz}%`, `${quizzes.length} completed quizzes`),
   );
 
@@ -223,7 +225,7 @@ function renderOverview() {
     }
     const series = [
       { key: "passed", label: "Passed", color: "--viz-pass" },
-      { key: "failed", label: "Not passed", color: "--viz-fail" },
+      { key: "failed", label: "Not passed", color: "--viz-fail", hatch: true },
     ];
     const c = chartCard({
       title: "Training activity",
@@ -238,7 +240,7 @@ function renderOverview() {
 
   // ---- certification progress
   {
-    const c = chartCard({ title: "Certification progress", subtitle: "Workers who passed both the practical and the quiz (all time)" });
+    const c = chartCard({ title: "Certification progress", subtitle: `Workers whose practice × 40% + quiz × 60% reached ${SCORING.passMark} (all time)` });
     charts.push([c, () => {
       const total = state.workers.length;
       c.body.replaceChildren(...modules.map((m) => {
@@ -281,7 +283,7 @@ function renderOverview() {
       table: { columns: ["Step", "Attempts", "Missed", "Missed %"], rows: steps.map((s) => [s.label, s.n, s.missed, pct(s.missed, s.n)]) },
     });
     charts.push([c, () => steps.length && barList(c.body, c.card, c.tooltip, {
-      max: 1, color: "--viz-fail",
+      max: 1, color: "--viz-fail", hatch: true,
       rows: steps.map((s) => ({ label: s.label, value: s.missed / s.n, valueText: `${pct(s.missed, s.n)} missed`,
         tip: [{ value: s.missed, label: "missed" }, { value: s.n, label: s.key === "forcedFailure" ? "furnace attempts" : "attempts" }] })),
     })]);
@@ -293,13 +295,14 @@ function renderOverview() {
     const done = qs.filter((q) => q.completed && q.correct != null);
     const closed = qs.filter((q) => !q.completed).length;
     const total = done[0]?.total || 10;
-    const passMark = done.find((q) => q.passMark)?.passMark || Math.ceil(total * 0.7);
+    // The pass mark depends on the practice score (see TrainingScoring); it is lowest with 100% practice.
+    const passMark = quizPassMark(100, total);
     const buckets = Array.from({ length: total + 1 }, (_, i) => ({ label: String(i), tipTitle: `${i} of ${total} correct`, values: { passed: 0, failed: 0 } }));
-    for (const q of done) buckets[Math.min(total, q.correct)].values[q.correct >= passMark ? "passed" : "failed"]++;
-    const series = [{ key: "passed", label: "Passed", color: "--viz-pass" }, { key: "failed", label: "Not passed", color: "--viz-fail" }];
+    for (const q of done) buckets[Math.min(total, q.correct)].values[q.correct >= (q.passMark ?? passMark) ? "passed" : "failed"]++;
+    const series = [{ key: "passed", label: "Passed", color: "--viz-pass" }, { key: "failed", label: "Not passed", color: "--viz-fail", hatch: true }];
     const c = chartCard({
       title: `${moduleLabel(m)} quiz scores`,
-      subtitle: `${done.length} completed · ${closed} closed before finishing · pass mark ${passMark}/${total}`,
+      subtitle: `${done.length} completed · ${closed} closed early · pass mark ${passMark}/${total} with full practice, higher below it`,
       legend: series,
       empty: done.length ? null : "No completed quizzes in this period.",
       table: { columns: ["Correct answers", "Quizzes"], rows: buckets.map((b) => [b.label, b.values.passed + b.values.failed]) },
@@ -370,8 +373,8 @@ function workerRow(w) {
 const certSortValue = (c) => (c.status === "certified" ? 2 : c.status === "in_progress" ? 1 : 0);
 
 function certCell(c) {
-  if (c.status === "certified") return el("span", {}, el("span", { class: "badge pass" }, "✓ Certified"), " ", el("span", { class: "muted small" }, fmtDate(c.certifiedAt, false)));
-  if (c.status === "in_progress") return el("span", { class: "badge warn" }, "In progress");
+  if (c.status === "certified") return el("span", {}, el("span", { class: "badge pass" }, `✓ ${c.certifiedTotal}/100`), " ", el("span", { class: "muted small" }, fmtDate(c.certifiedAt, false)));
+  if (c.status === "in_progress") return el("span", { class: "badge warn" }, c.best ? `Best ${c.best.total}/100` : "In progress");
   return el("span", { class: "muted" }, "Not started");
 }
 
@@ -501,7 +504,9 @@ function renderWorker(id) {
     return;
   }
   $("worker-name").textContent = w.display_name;
-  $("worker-meta").replaceChildren(el("span", { class: "mono" }, w.worker_code), ` · ${w.active ? "Active" : "Login disabled"} · added ${fmtDate(w.created_at, false)}`);
+  $("worker-meta").replaceChildren(el("span", { class: "id-tag" }, w.worker_code),
+    el("span", { class: w.active ? "badge pass" : "badge off" }, w.active ? "Active" : "Login disabled"),
+    `Added ${fmtDate(w.created_at, false)}`);
   $("toggle-active-btn").textContent = w.active ? "Disable login" : "Enable login";
   $("toggle-active-btn").classList.toggle("danger", w.active);
 
@@ -539,10 +544,36 @@ function moduleCard(m, cert, attempts) {
   const q = cert.bestQuiz;
   items.push(["Quiz", partState(quizRows, () => (q && q.correct != null ? `best ${q.correct}/${q.total}` : `best ${q?.pct ?? 0}%`))]);
 
-  return el("div", { class: "card module-card" },
+  return el("div", { class: "module-card" },
     el("div", { class: "module-head" }, el("h2", {}, moduleLabel(m)), status),
+    scoreBar(cert),
     el("ul", { class: "steps" }, items.map(([label, st]) => el("li", {}, el("span", {}, label), st))),
-    el("p", { class: "muted small" }, cert.certifiedAt ? `Certified ${fmtDate(cert.certifiedAt)}` : "Certified once the practical part and the quiz are both passed."));
+    el("p", { class: "module-foot" }, cert.certifiedAt
+      ? `Certified ${fmtDate(cert.certifiedAt)} with ${cert.certifiedTotal}/100.`
+      : `Certified when practice × 40% + quiz × 60% reaches ${SCORING.passMark}.`));
+}
+
+/**
+ * 100-point bar: the 0-40 slot fills with the practice contribution, the 40-100 slot with the
+ * quiz contribution, and a notch marks the pass mark. Uses the best-scoring quiz, or the current
+ * practice score alone when no quiz has been completed yet.
+ */
+function scoreBar(cert) {
+  const practice = cert.best?.practice ?? cert.practicePercent ?? 0;
+  const quiz = cert.best?.quiz ?? 0;
+  const pPts = Math.round(practice * SCORING.practiceWeight);
+  const qPts = Math.round(quiz * SCORING.quizWeight);
+  const total = cert.best?.total ?? pPts;
+  const passed = total >= SCORING.passMark;
+  return el("div", { class: "scorebar", role: "img", "aria-label": `Practice ${pPts} of 40, quiz ${qPts} of 60, total ${total} of 100; pass mark ${SCORING.passMark}` },
+    el("div", { class: "scorebar-track" },
+      el("div", { class: "scorebar-slot practice" }, el("div", { class: "scorebar-fill", style: `width:${practice}%` })),
+      el("div", { class: "scorebar-slot quiz" }, el("div", { class: "scorebar-fill", style: `width:${quiz}%` })),
+      el("div", { class: "scorebar-notch" })),
+    el("div", { class: "scorebar-legend" },
+      el("span", {}, "Practice ", el("b", {}, `${pPts}`), "/40"),
+      el("span", {}, "Quiz ", el("b", {}, cert.best ? `${qPts}` : "—"), "/60"),
+      el("span", { class: `scorebar-total ${passed ? "pass" : "fail"}` }, `${total}`)));
 }
 
 function renderAttempts() {
@@ -705,15 +736,15 @@ function renderCertificates() {
     el("td", { class: "mono" }, w.worker_code),
     el("td", {}, w.display_name),
     el("td", {}, moduleLabel(m)),
-    el("td", { class: "num" }, c.bestQuiz ? (c.bestQuiz.correct != null ? `${c.bestQuiz.correct}/${c.bestQuiz.total}` : `${c.bestQuiz.pct}%`) : "—"),
+    el("td", { class: "num" }, `${c.certifiedTotal}/100`),
     el("td", {}, el("span", { class: w.active ? "badge pass" : "badge off" }, w.active ? "Active" : "Disabled")))));
   $("certs-empty").hidden = rows.length > 0;
   $("certs-count").textContent = `${rows.length} certificate${rows.length === 1 ? "" : "s"}`;
 }
 
 $("export-certs-btn").addEventListener("click", () => {
-  downloadCsv("surakshaar-certificates.csv", ["certified_at", "worker_id", "name", "training", "best_quiz", "worker_status"],
-    certificateRows().map(({ w, m, c }) => [c.certifiedAt, w.worker_code, w.display_name, moduleLabel(m),
+  downloadCsv("surakshaar-certificates.csv", ["certified_at", "worker_id", "name", "training", "total_score", "best_quiz", "worker_status"],
+    certificateRows().map(({ w, m, c }) => [c.certifiedAt, w.worker_code, w.display_name, moduleLabel(m), c.certifiedTotal,
       c.bestQuiz ? (c.bestQuiz.correct != null ? `${c.bestQuiz.correct}/${c.bestQuiz.total}` : `${c.bestQuiz.pct}%`) : "", w.active ? "active" : "disabled"]));
 });
 
@@ -744,7 +775,7 @@ $("verify-form").addEventListener("submit", async (e) => {
     const w = match.worker;
     out.replaceChildren(el("div", { class: "verify-box ok" }, el("h3", {}, "✓ Verified against training records"),
       el("p", {}, "Matches ", el("a", { href: `#/worker/${w.id}` }, `${w.display_name} (${w.worker_code})`),
-        `, whose synced records show the practical and the quiz passed (quiz passed ${fmtDate(match.matchedAt)}).`), facts));
+        `, whose synced records reach the pass mark of ${SCORING.passMark}/100 (quiz completed ${fmtDate(match.matchedAt)}).`), facts));
   } else {
     out.replaceChildren(el("div", { class: "verify-box warn" }, el("h3", {}, "⚠ Not confirmed — no matching training record"),
       el("p", {}, match.nameMatches

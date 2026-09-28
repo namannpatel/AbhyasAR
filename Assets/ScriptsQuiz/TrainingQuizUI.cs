@@ -19,9 +19,12 @@ using Random = UnityEngine.Random;
 /// question's option order are reshuffled on every attempt so answers can't be memorised by
 /// position. Content lives in the QuizBanks classes; all text is localized.
 ///
-/// Passing is mandatory for the module's certificate. Every attempt is recorded to
-/// ProgressStore as module <see cref="progressModule"/>, scenario "&lt;scene&gt;/Quiz" -- a finished
-/// attempt with its score, and one closed before the end as a failed, incomplete attempt.
+/// The quiz is 60% of the module's final mark (see <see cref="TrainingScoring"/>): the owner passes
+/// in the practice score via <see cref="SetPracticePercent"/> before <see cref="Show"/>, and this
+/// quiz's pass mark is the fewest correct answers that bring the combined total to the pass mark.
+/// Every attempt is recorded to ProgressStore as module <see cref="progressModule"/>, scenario
+/// "&lt;scene&gt;/Quiz" -- a finished attempt with its score, and one closed before the end as a
+/// failed, incomplete attempt.
 /// </summary>
 public class TrainingQuizUI : MonoBehaviour
 {
@@ -73,6 +76,17 @@ public class TrainingQuizUI : MonoBehaviour
     public int BestScore { get; private set; }
 
     public int QuestionCount => QuizBanks.Get(bank).Length;
+
+    /// <summary><see cref="BestScore"/> as a percentage of <see cref="QuestionCount"/>; 0 before any finished attempt.</summary>
+    public int BestPercent => TrainingScoring.Percent(BestScore, QuestionCount);
+
+    private int practicePercent = 100;
+
+    /// <summary>Practice score (0-100) this quiz's pass mark is computed against. Set before <see cref="Show"/>.</summary>
+    public void SetPracticePercent(int percent)
+    {
+        practicePercent = Mathf.Clamp(percent, 0, 100);
+    }
 
     [Serializable]
     private class QuizAttemptDetails
@@ -277,7 +291,24 @@ public class TrainingQuizUI : MonoBehaviour
             Time.realtimeSinceStartup - attemptStartTime, JsonUtility.ToJson(details));
     }
 
-    private int PassMark => Mathf.CeilToInt(order.Count * QuizBanks.PassFraction);
+    /// <summary>
+    /// Fewest correct answers that bring the combined practice + quiz total to the pass mark.
+    /// order.Count + 1 when even a perfect quiz can't (the practice score is too low).
+    /// </summary>
+    private int PassMark
+    {
+        get
+        {
+            for (int correct = 0; correct <= order.Count; correct++)
+            {
+                if (TrainingScoring.IsPass(practicePercent, TrainingScoring.Percent(correct, order.Count)))
+                {
+                    return correct;
+                }
+            }
+            return order.Count + 1;
+        }
+    }
 
     /// <summary>Re-fetches every visible string -- called on each state change and whenever the language switches mid-quiz.</summary>
     private void RefreshTexts()
@@ -291,9 +322,18 @@ public class TrainingQuizUI : MonoBehaviour
         {
             bool passed = score >= PassMark;
             resultTitleText.text = LocalizationManager.Get(passed ? "quiz_result_pass_title" : "quiz_result_fail_title");
-            resultScoreText.text = passed
-                ? LocalizationManager.Get("quiz_result_pass_format", score, order.Count)
-                : LocalizationManager.Get("quiz_result_fail_format", score, order.Count, PassMark);
+            if (passed)
+            {
+                resultScoreText.text = LocalizationManager.Get("quiz_result_pass_format", score, order.Count);
+            }
+            else if (PassMark > order.Count)
+            {
+                resultScoreText.text = LocalizationManager.Get("quiz_result_fail_practice_format", score, order.Count);
+            }
+            else
+            {
+                resultScoreText.text = LocalizationManager.Get("quiz_result_fail_format", score, order.Count, PassMark);
+            }
             return;
         }
 

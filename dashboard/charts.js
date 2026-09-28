@@ -1,7 +1,9 @@
 // Small dependency-free chart kit (SVG + HTML). Every chart lives in a card with a title, a
 // legend when there is more than one series, a hover/focus tooltip, and a "Table" toggle that
 // swaps the chart for an equivalent table (tooltips enhance, never gate).
-// Colors come from CSS custom properties (--viz-*) defined in styles.css for light and dark.
+// Colors come from CSS custom properties (--viz-*) defined in styles.css. A series marked
+// `hatch: true` is drawn in yellow/black hazard stripes (used for "not passed"), so pass/fail
+// never depends on hue alone.
 
 const SVG = "http://www.w3.org/2000/svg";
 
@@ -52,7 +54,7 @@ export function chartCard({ title, subtitle, legend, table, empty }) {
 
 function renderLegend(items) {
   return h("div", { class: "viz-legend" }, items.map((it) =>
-    h("span", { class: "viz-legend-item" }, h("span", { class: "viz-swatch", style: `background:var(${it.color})` }), it.label)));
+    h("span", { class: "viz-legend-item" }, h("span", { class: it.hatch ? "viz-swatch hatch" : "viz-swatch", style: `background:var(${it.color})` }), it.label)));
 }
 
 function buildTable({ columns, rows }) {
@@ -82,14 +84,20 @@ function tipContent(tooltip, title, rows) {
   tooltip.replaceChildren(
     h("div", { class: "viz-tip-title" }, title),
     ...rows.map((r) => h("div", { class: "viz-tip-row" },
-      r.color ? h("span", { class: "viz-key", style: `background:var(${r.color})` }) : null,
+      r.color ? h("span", { class: r.hatch ? "viz-key hatch" : "viz-key", style: `background:var(${r.color})` }) : null,
       h("strong", {}, r.value), " ", h("span", { class: "muted" }, r.label))));
 }
 
-// Rect with 4px rounded top corners (the data-end), square at the baseline.
-function topRoundedRect(x, y, w, hgt, r) {
-  r = Math.min(r, w / 2, hgt);
-  return `M${x},${y + hgt} V${y + r} Q${x},${y} ${x + r},${y} H${x + w - r} Q${x + w},${y} ${x + w},${y + r} V${y + hgt} Z`;
+// Yellow/black diagonal stripes as an SVG pattern, unique per chart.
+let hatchSeq = 0;
+function hatchPattern(svg) {
+  const id = `viz-hatch-${++hatchSeq}`;
+  const pattern = s("pattern", { id, width: 8, height: 8, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+  pattern.append(s("rect", { width: 8, height: 8, fill: "var(--bg)" }), s("rect", { width: 4, height: 8, fill: "var(--viz-fail)" }));
+  const defs = s("defs");
+  defs.append(pattern);
+  svg.append(defs);
+  return `url(#${id})`;
 }
 
 /**
@@ -111,6 +119,8 @@ export function columnChart(body, card, tooltip, { buckets, series, height = 200
     const y = (v) => M.top + plotH - (v / yMax) * plotH;
 
     const svg = s("svg", { viewBox: `0 0 ${W} ${plotH + M.top + M.bottom}`, width: "100%", role: "img", "aria-label": yTitle || "chart" });
+    const hatchFill = series.some((sr) => sr.hatch) ? hatchPattern(svg) : null;
+    const fillOf = (sr) => (sr.hatch ? hatchFill : `var(${sr.color})`);
     // gridlines + y ticks
     for (let i = 0; i <= 4; i++) {
       const v = (yMax / 4) * i;
@@ -138,19 +148,18 @@ export function columnChart(body, card, tooltip, { buckets, series, height = 200
       drawn.forEach((d, j) => {
         const y0 = y(acc), y1 = y(acc + d.v);
         acc += d.v;
-        const gap = j > 0 ? 2 : 0; // 2px surface gap between stacked segments
-        const top = j === drawn.length - 1;
+        const gap = j > 0 ? 2 : 0; // 2px ground gap between stacked segments
         const hh = Math.max(0, y0 - y1 - gap);
         if (hh <= 0) return;
-        g.append(top ? s("path", { d: topRoundedRect(x, y1, barW, hh, 4), fill: `var(${d.sr.color})` })
-                     : s("rect", { x, y: y1, width: barW, height: hh, fill: `var(${d.sr.color})` }));
+        g.append(s("rect", { x, y: y1, width: barW, height: hh, fill: fillOf(d.sr),
+          stroke: d.sr.hatch ? "var(--viz-fail)" : null, "stroke-width": d.sr.hatch ? 1 : null }));
       });
       // hit target = the whole band, taller than the mark
       const hit = s("rect", { x: M.left + band * i, y: M.top, width: band, height: plotH, class: "viz-hit", tabindex: "0",
         "aria-label": `${b.tipTitle || b.label}: ${series.map((sr) => `${sr.label} ${b.values[sr.key] || 0}`).join(", ")}` });
       const show = () => {
         groups.forEach((gg, k) => gg.classList.toggle("dim", k !== i));
-        tipContent(tooltip, b.tipTitle || b.label, [...series].reverse().map((sr) => ({ color: sr.color, value: fmtInt(b.values[sr.key] || 0), label: sr.label })));
+        tipContent(tooltip, b.tipTitle || b.label, [...series].reverse().map((sr) => ({ color: sr.color, hatch: sr.hatch, value: fmtInt(b.values[sr.key] || 0), label: sr.label })));
         const sr = svg.getBoundingClientRect(), cr = card.getBoundingClientRect(), k = sr.width / W;
         placeTip(tooltip, card, sr.left - cr.left + (M.left + band * i + band / 2) * k, sr.top - cr.top + y(acc) * k);
       };
@@ -180,13 +189,13 @@ export function columnChart(body, card, tooltip, { buckets, series, height = 200
  * Horizontal bars, one row per item (HTML, so long labels wrap instead of colliding).
  * rows: [{ label, value (0..max), valueText, tip: [..lines] }]
  */
-export function barList(body, card, tooltip, { rows, max = 1, color = "--viz-pass" }) {
+export function barList(body, card, tooltip, { rows, max = 1, color = "--viz-pass", hatch = false }) {
   const list = h("div", { class: "viz-bars" }, rows.map((r) => {
     const pct = max ? Math.max(0, Math.min(1, r.value / max)) : 0;
     const row = h("div", { class: "viz-bar-row", tabindex: "0", "aria-label": `${r.label}: ${r.valueText}` },
       h("div", { class: "viz-bar-label" }, r.label),
       h("div", { class: "viz-bar-track" },
-        h("div", { class: "viz-bar", style: `width:${(pct * 100).toFixed(1)}%;background:var(${r.color || color})` })),
+        h("div", { class: hatch ? "viz-bar hatch" : "viz-bar", style: `width:${(pct * 100).toFixed(1)}%;background:var(${r.color || color})` })),
       h("div", { class: "viz-bar-value" }, r.valueText));
     const show = () => {
       tipContent(tooltip, r.label, (r.tip || []).map((t) => ({ value: t.value, label: t.label })));

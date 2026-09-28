@@ -1,6 +1,5 @@
 {
   "app_title": "SurakshaAR",
-  "menu_tutorial": "ट्यूटोरियल",
   "menu_fire_training": "अग्नि प्रशिक्षण",
   "menu_machine_training": "मशीन प्रशिक्षण",
   "menu_options": "विकल्प",
@@ -108,6 +107,8 @@
   "quiz_result_fail_title": "पास नहीं हुए — फिर से कोशिश करें",
   "quiz_result_pass_format": "आपके {1} में से {0} अंक आए। बहुत बढ़िया!",
   "quiz_result_fail_format": "आपके {1} में से {0} अंक आए। पास होने के लिए {2} चाहिए।",
+  "quiz_result_fail_practice_format": "आपके {1} में से {0} अंक आए। आपका अभ्यास स्कोर पास होने के लिए बहुत कम है। अभ्यास फिर से करें।",
+  "score_breakdown_format": "अभ्यास {0}/100 × 40% + क्विज़ {1}/100 × 60% = {2}/100 (पास: {3})",
   "quiz_q_identify_ext": "इस अग्निशामक को पहचानें। यह किस प्रकार की आग के लिए है?",
   "quiz_opt_class_a": "क्लास A: लकड़ी, कागज़ और कपड़े जैसे सामान्य ज्वलनशील पदार्थ",
   "quiz_opt_class_bc": "क्लास BC: ज्वलनशील तरल और बिजली की आग",

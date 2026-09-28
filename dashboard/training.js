@@ -1,7 +1,17 @@
 // Training domain model: how the Unity app records attempts, and what "certified" means.
-// Kept in one place so the dashboard's rules match the app's (see TrainingResultsUI.cs and
-// MachineTrainingResultsUI.cs): a module is passed only when its practical part is passed AND
-// its quiz is passed.
+// Kept in one place so the dashboard's rules match the app's (see TrainingScoring.cs,
+// TrainingResultsUI.cs and MachineTrainingResultsUI.cs): the final mark is practice × 40% +
+// quiz × 60%, and a module is passed at a total of 80/100 or more.
+
+export const SCORING = { practiceWeight: 0.4, quizWeight: 0.6, passMark: 80 };
+export const totalScore = (practicePct, quizPct) =>
+  Math.round(practicePct * SCORING.practiceWeight + quizPct * SCORING.quizWeight);
+
+/** Fewest correct answers (of `total`) that pass with this practice score; total + 1 when none can. */
+export function quizPassMark(practicePct, total) {
+  for (let k = 0; k <= total; k++) if (totalScore(practicePct, Math.round((k / total) * 100)) >= SCORING.passMark) return k;
+  return total + 1;
+}
 
 export const MODULES = {
   fire_safety: { key: "fire_safety", label: "Fire Safety", practicalLabel: "Fire scenarios" },
@@ -60,41 +70,65 @@ export function quizResult(attempt) {
 }
 
 /**
+ * Practice score (0-100) as the app computed it when a quiz ran at time `t`: machine training is
+ * its latest practice record, fire training the average of each scenario's latest score. null if
+ * no practical attempt came before `t` (the app only runs the quiz after the practical part).
+ */
+function practicePercentAt(module, practicals, t) {
+  const before = practicals.filter((a) => Date.parse(a.completed_at) <= t + 60_000)
+    .sort((x, y) => Date.parse(y.completed_at) - Date.parse(x.completed_at));
+  if (!before.length) return null;
+  if (module === "machine_training") return before[0].score ?? 100;
+  const latest = new Map();
+  for (const a of before) {
+    const key = parseScenario(module, a.scenario).key;
+    if (!latest.has(key)) latest.set(key, a.score ?? 0);
+  }
+  const scores = [...latest.values()];
+  return Math.round(scores.reduce((n, s) => n + s, 0) / scores.length);
+}
+
+/**
  * Certification status of one worker in one module, from that worker's attempts (any order).
- * Certified at the first passed quiz that came at or after a passed practical attempt -- the
- * app only runs the quiz once the practical part is finished, and only then issues a certificate.
+ * Every completed quiz is scored against the practice score at that moment; the module is
+ * certified at the first quiz whose weighted total reached the pass mark.
  */
 export function certification(attempts, module) {
   const mine = attempts.filter((a) => a.module === module);
   const practicalKind = module === "machine_training" ? "practice" : "scenario";
   const practicals = mine.filter((a) => parseScenario(module, a.scenario).kind === practicalKind);
-  const quizzes = mine.filter((a) => parseScenario(module, a.scenario).kind === "quiz");
-  const firstPracticalPass = minTime(practicals.filter((a) => a.passed));
-  const passedQuizTimes = quizzes.filter((a) => a.passed).map((a) => Date.parse(a.completed_at)).sort((x, y) => x - y);
-  // every passed quiz that came after a passed practical -- each one is a moment a certificate could be issued
-  const qualifyingTimes = firstPracticalPass == null ? [] : passedQuizTimes.filter((t) => t >= firstPracticalPass - 60_000);
+  const quizzes = mine.filter((a) => parseScenario(module, a.scenario).kind === "quiz")
+    .sort((x, y) => Date.parse(x.completed_at) - Date.parse(y.completed_at));
+
+  const scored = [];
+  for (const a of quizzes) {
+    const q = quizResult(a);
+    const t = Date.parse(a.completed_at);
+    const practice = practicePercentAt(module, practicals, t);
+    if (!q.completed || q.pct == null || practice == null) continue;
+    scored.push({ t, practice, quiz: q.pct, total: totalScore(practice, q.pct) });
+  }
+  // every quiz that reached the pass mark -- each one is a moment a certificate could be issued
+  const qualifying = scored.filter((s) => s.total >= SCORING.passMark);
+  const qualifyingTimes = qualifying.map((s) => s.t);
   const certifiedMs = qualifyingTimes[0] ?? null;
+  const best = scored.reduce((b, s) => (!b || s.total > b.total ? s : b), null);
+  const practiceNow = practicePercentAt(module, practicals, Infinity);
 
   const bestQuiz = quizzes.map(quizResult).filter((q) => q.pct != null).sort((x, y) => y.pct - x.pct)[0] || null;
   return {
     status: certifiedMs != null ? "certified" : mine.length ? "in_progress" : "not_started",
     certifiedAt: certifiedMs != null ? new Date(certifiedMs).toISOString() : null,
-    practicalPassed: firstPracticalPass != null,
+    certifiedTotal: qualifying[0]?.total ?? null,
+    practicalPassed: practicals.some((a) => a.passed),
     practicalAttempts: practicals.length,
-    quizPassed: passedQuizTimes.length > 0,
+    practicePercent: practiceNow,
+    quizPassed: qualifying.length > 0,
     quizAttempts: quizzes.length,
     bestQuiz,
+    best,              // { practice, quiz, total } of the highest-scoring quiz, or null
     qualifyingTimes,
   };
-}
-
-function minTime(list) {
-  let best = null;
-  for (const a of list) {
-    const t = Date.parse(a.completed_at);
-    if (best == null || t < best) best = t;
-  }
-  return best;
 }
 
 // ------------------------------------------------------------------ certificates
@@ -135,8 +169,8 @@ export async function checksumMatches(cert) {
 }
 
 /**
- * Looks for synced records backing a certificate: a worker with that name who passed that
- * module's practical and quiz, with a qualifying quiz pass within a day of the issue time.
+ * Looks for synced records backing a certificate: a worker with that name whose weighted
+ * practice + quiz total reached the pass mark within a day of the issue time.
  */
 export function matchCertificate(cert, workers, attemptsByWorker) {
   const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");

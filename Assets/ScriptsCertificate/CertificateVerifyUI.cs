@@ -17,9 +17,13 @@ public class CertificateVerifyUI : MonoBehaviour
     [SerializeField] private Button verifyButton;
     [SerializeField] private Button closeButton;
 
+    private bool showing;
+
     private void Awake()
     {
-        if (panelRoot != null)
+        // This script lives on panelRoot, which is saved inactive, so Awake first runs during
+        // Show()'s SetActive(true) -- hiding unconditionally here undid the first tap.
+        if (panelRoot != null && !showing)
         {
             panelRoot.SetActive(false);
         }
@@ -45,7 +49,9 @@ public class CertificateVerifyUI : MonoBehaviour
     {
         if (panelRoot != null)
         {
+            showing = true;
             panelRoot.SetActive(true);
+            showing = false;
         }
         if (payloadInput != null)
         {
