@@ -5,12 +5,12 @@ A static site with no build step. Admins use it to manage worker logins, follow 
 | Page | What it's for |
 |---|---|
 | **Overview** | Key numbers and charts for a chosen period and training: activity over time, certification progress, pass rate per training part, the fire-scenario steps trainees miss most, and quiz score spread. Every chart has a **Table** view. |
-| **Workers** | Everyone's login status and certification per training (Fire Safety, Machine Safety), with search, filters, sorting and CSV export. **+ Add workers** creates one or many logins at once. |
+| **Workers** | Everyone's login status and certification per training (Fire Safety, Machinery Training), with search, filters, sorting and CSV export. **+ Add workers** creates one or many logins at once. |
 | **Worker detail** | Progress per training (each fire scenario, conveyor practice, best quiz score), full attempt history with step-by-step details, and account actions: rename, reset password, disable/enable login, delete. |
 | **Certificates** | Every certificate earned, exportable, plus **Verify a certificate**: paste the text from a certificate's QR code to check it against the worker's synced records. |
 | **Admins** | Who can sign in to the dashboard; give or remove admin access. |
 
-**Certified** means the same as in the app: the training's practical part was passed **and** its quiz was passed afterwards. (Fire Safety: the fire scenarios, then the fire quiz. Machine Safety: all 7 conveyor controls practised, then the machine quiz.)
+**Certified** means the same as in the app: the training's practical part was passed **and** its quiz was passed afterwards. (Fire Safety: the fire scenarios, then the fire quiz. Machinery Training: all 7 conveyor controls practised, then the machine quiz.)
 
 ## One-time Supabase setup
 

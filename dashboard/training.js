@@ -5,7 +5,7 @@
 
 export const MODULES = {
   fire_safety: { key: "fire_safety", label: "Fire Safety", practicalLabel: "Fire scenarios" },
-  machine_training: { key: "machine_training", label: "Machine Safety", practicalLabel: "Conveyor practice" },
+  machine_training: { key: "machine_training", label: "Machinery Training", practicalLabel: "Conveyor practice" },
 };
 export const MODULE_KEYS = Object.keys(MODULES);
 
