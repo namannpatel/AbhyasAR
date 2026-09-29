@@ -72,6 +72,38 @@ public static class CertificateStore
         }
     }
 
+    /// <summary>Certificates earned by this worker on this device, including ones awaiting sync.</summary>
+    public static List<CertificateRecord> GetForWorker(string workerId)
+    {
+        return string.IsNullOrEmpty(workerId)
+            ? new List<CertificateRecord>()
+            : new List<CertificateRecord>(Load(workerId).records);
+    }
+
+    /// <summary>Cache certificates issued on another device for offline viewing.</summary>
+    public static void MergeFromServer(string workerId, IEnumerable<CertificateRecord> incoming)
+    {
+        if (string.IsNullOrEmpty(workerId) || incoming == null) return;
+        var file = Load(workerId);
+        bool changed = false;
+        foreach (var record in incoming)
+        {
+            if (record == null || string.IsNullOrEmpty(record.id)) continue;
+            var existing = file.records.Find(r => r.id == record.id);
+            if (existing != null)
+            {
+                if (!existing.synced) { existing.synced = true; changed = true; }
+            }
+            else
+            {
+                record.synced = true;
+                file.records.Add(record);
+                changed = true;
+            }
+        }
+        if (changed) Save(workerId, file);
+    }
+
     public static List<CertificateRecord> GetUnsynced(string workerId, int max)
     {
         var result = new List<CertificateRecord>();

@@ -128,6 +128,23 @@ public class CertificateUI : MonoBehaviour
     /// </summary>
     public static void ShowForTraining(string forModuleKey, string forModuleName, int forScore)
     {
+        CertificateUI target = FindOrCreatePanel();
+        target?.ShowAndGenerate(forModuleKey, forModuleName, forScore);
+    }
+
+    /// <summary>Reopens an already earned certificate without issuing another one.</summary>
+    public static void ShowSaved(CertificateRecord certificate, string traineeName, string forModuleName)
+    {
+        if (certificate == null) return;
+        CertificateUI target = FindOrCreatePanel();
+        if (target == null) return;
+        target.Show(certificate.module, forModuleName, certificate.score);
+        target.ShowCertificateArtwork(traineeName, certificate,
+            CertificateService.RenderQrTexture(CertificateService.BuildVerificationUrl(certificate.id)));
+    }
+
+    private static CertificateUI FindOrCreatePanel()
+    {
         CertificateUI target = null;
         foreach (var candidate in Resources.FindObjectsOfTypeAll<CertificateUI>())
         {
@@ -144,7 +161,7 @@ public class CertificateUI : MonoBehaviour
             if (canvas == null)
             {
                 Debug.LogError("CertificateUI: no Canvas found in this scene.");
-                return;
+                return null;
             }
             var host = new GameObject("RuntimeCertificatePanel", typeof(RectTransform), typeof(Image));
             host.transform.SetParent(canvas.transform, false);
@@ -158,7 +175,7 @@ public class CertificateUI : MonoBehaviour
             target.panelRoot = host;
         }
 
-        target.ShowAndGenerate(forModuleKey, forModuleName, forScore);
+        return target;
     }
 
     private void HandleGenerate()

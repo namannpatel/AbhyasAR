@@ -19,6 +19,7 @@ A static site with no build step. Admins use it to manage worker logins, follow 
    - `supabase/migrations/0001_init.sql`
    - `supabase/migrations/0002_admin_dashboard.sql` (adds bulk add, rename, delete and admin management; safe to run again)
    - `supabase/migrations/0003_certificates.sql` (adds server-backed issuance and public QR verification; safe to run again)
+   - `supabase/migrations/0004_worker_certificates.sql` (lets signed-in workers retrieve their own issued certificates in the Unity app; safe to run again)
 3. Go to **Authentication → Users → Add user**, create an admin with an email and password, and copy that user's UUID.
 4. In the SQL Editor, run:
    ```sql
@@ -57,6 +58,7 @@ Already running the dashboard from before? Run any migration you have not applie
 New certificates encode `https://namannpatel.github.io/SurakshaAR/#/verify/<certificate-id>`. A normal phone camera opens this route without an admin login. The route calls the public `verify_certificate` RPC, which returns only the trainee name, training, score, issue time and certificate ID for a real server-backed issuance. Worker codes, attempts and login details remain private.
 
 The Unity app stores a certificate locally first, just like progress. `SyncService` uploads the passed attempts and then the issuance. Until that sync succeeds, the public page reports that the certificate has not reached the server yet.
+The app's **View Certificate** section shows locally saved certificates offline, refreshes issued certificates from Supabase when online, and shows the 80% requirement for training without a certificate.
 
 Legacy QR payloads using `AR-CERT|v1|name|training|score|time|checksum` can still be pasted into the admin checker. The dashboard then compares them with synced training records.
 
