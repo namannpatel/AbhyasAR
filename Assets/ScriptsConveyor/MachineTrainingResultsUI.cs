@@ -1,11 +1,12 @@
 using System;
+using System.Collections;
 using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// End of the Machine Training (conveyor) module, mirroring the Fire Training flow: once
+/// End of the Machine Training (conveyor) module, mirroring the Fire Safety flow: once
 /// ConveyorTrainingTracker reports every control practised, the belt is stopped, the practice
 /// is recorded, and the machine-safety quiz runs. When the quiz closes, this results panel
 /// shows the practice checklist and the training outcome.
@@ -24,6 +25,9 @@ public class MachineTrainingResultsUI : MonoBehaviour
     [Tooltip("Machine-safety quiz run once the practice is complete. Leave unset to skip the quiz.")]
     [SerializeField] private TrainingQuizUI quiz;
 
+    [Tooltip("Seconds to wait after the last practice step is done before the quiz (or the results panel) appears, so the trainee sees the training finish instead of being cut straight to the quiz.")]
+    [SerializeField] private float quizDelaySeconds = 3f;
+
     [SerializeField] private GameObject panelRoot;
     [SerializeField] private TMP_Text checklistText;
     [SerializeField] private TMP_Text overallResultText;
@@ -36,6 +40,7 @@ public class MachineTrainingResultsUI : MonoBehaviour
     [SerializeField] private CertificateUI certificateUI;
 
     private const string ProgressModule = "machine_training";
+    private Coroutine pendingReveal;
     private static readonly Color PassColor = new Color32(0x2E, 0x7D, 0x32, 0xFF);
     private static readonly Color FailColor = new Color32(0xC6, 0x28, 0x28, 0xFF);
 
@@ -100,6 +105,7 @@ public class MachineTrainingResultsUI : MonoBehaviour
         {
             quiz.OnClosed -= HandleQuizClosed;
         }
+        CancelPendingReveal();
         retryButton?.onClick.RemoveListener(HandleRetry);
         backToMenuButton?.onClick.RemoveListener(HandleBackToMenu);
         LocalizationManager.OnLanguageChanged -= Refresh;
@@ -113,16 +119,41 @@ public class MachineTrainingResultsUI : MonoBehaviour
         ProgressStore.Record(ProgressModule, gameObject.scene.name + "/Practice", true, 100,
             tracker.CompletedElapsedSeconds, JsonUtility.ToJson(new PracticeDetails { tasksCompleted = tracker.TaskCount }));
 
+        // Give the finished practice a moment to register before switching screens.
+        CancelPendingReveal();
+        pendingReveal = StartCoroutine(RevealAfterDelay());
+    }
+
+    private IEnumerator RevealAfterDelay()
+    {
+        yield return new WaitForSecondsRealtime(Mathf.Max(0f, quizDelaySeconds));
+        pendingReveal = null;
+
+        // The trainee may have reset the practice during the wait: then there is nothing to reveal.
+        if (tracker == null || !tracker.IsComplete)
+        {
+            yield break;
+        }
+
         if (quiz != null && !TrainingScoring.IsPass(PracticePercent, quiz.BestPercent))
         {
             quiz.OnClosed -= HandleQuizClosed;
             quiz.OnClosed += HandleQuizClosed;
             quiz.SetPracticePercent(PracticePercent);
             quiz.Show();
-            return;
+            yield break;
         }
 
         ShowPanel();
+    }
+
+    private void CancelPendingReveal()
+    {
+        if (pendingReveal != null)
+        {
+            StopCoroutine(pendingReveal);
+            pendingReveal = null;
+        }
     }
 
     private void HandleQuizClosed()
