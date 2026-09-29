@@ -1,4 +1,4 @@
--- SurakshaAR: server-backed certificates and public QR verification.
+-- AbhyasAR: server-backed certificates and public QR verification.
 -- Apply after 0001_init.sql and 0002_admin_dashboard.sql.
 
 create table if not exists public.certificates (

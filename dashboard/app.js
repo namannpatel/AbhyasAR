@@ -2,7 +2,7 @@ import { MODULES, MODULE_KEYS, FIRE_SCENARIOS, FIRE_STEPS, SCORING, quizPassMark
          parseCertificate, checksumMatches, matchCertificate } from "./training.js";
 import { chartCard, columnChart, barList, meter } from "./charts.js";
 
-const cfg = window.SURAKSHA_CONFIG || {};
+const cfg = window.ABHYAS_CONFIG || {};
 const configured = cfg.supabaseUrl && !/YOUR-PROJECT/.test(cfg.supabaseUrl) && cfg.supabaseAnonKey && !/YOUR-ANON-KEY/.test(cfg.supabaseAnonKey);
 const db = configured ? supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey) : null;
 
@@ -64,7 +64,7 @@ const pct = (part, whole) => (whole ? `${Math.round((part / whole) * 100)}%` : "
 const humanize = (key) => key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 const ERRORS = {
-  not_admin: "This account is not a SurakshaAR admin.",
+  not_admin: "This account is not a AbhyasAR admin.",
   name_required: "Enter a name.",
   names_required: "Enter at least one name.",
   too_many_names: "Add at most 200 workers at a time.",
@@ -133,6 +133,14 @@ async function loadAll() {
       attempts.push(...data);
       if (data.length < PAGE) break;
     }
+    // A practice attempt scoring at least the pass mark counts as passed, whatever step-by-step flag the
+    // device stored (older builds marked e.g. a 90 as "not passed"). Quizzes keep their stored flag.
+    for (const a of attempts) {
+      if (!a.passed && !/\/Quiz$/.test(a.scenario || "") && (a.score ?? 0) >= SCORING.passMark) a.passed = true;
+    }
+    const passedByWorker = new Map();
+    for (const a of attempts) if (a.passed) passedByWorker.set(a.worker_id, (passedByWorker.get(a.worker_id) || 0) + 1);
+    for (const w of workers) w.passed = passedByWorker.get(w.id) || 0;
     state.workers = workers;
     state.attempts = attempts;
     state.issuedCertificates = await rpc("admin_list_certificates").catch(() => []);
@@ -476,7 +484,7 @@ for (const th of document.querySelectorAll("table.sortable th[data-sort]")) {
 
 $("export-workers-btn").addEventListener("click", () => {
   const rows = state.workers.map(workerRow);
-  downloadCsv("surakshaar-workers.csv",
+  downloadCsv("abhyasar-workers.csv",
     ["worker_id", "name", "status", "fire_safety", "fire_safety_certified_at", "machine_safety", "machine_safety_certified_at", "attempts", "passed", "last_activity", "added"],
     rows.map((w) => [w.worker_code, w.display_name, w.active ? "active" : "disabled",
       w.certs.fire_safety.status, w.certs.fire_safety.certifiedAt || "", w.certs.machine_training.status, w.certs.machine_training.certifiedAt || "",
@@ -527,7 +535,7 @@ function showCredentials(title, list) {
 
 $("cred-copy").addEventListener("click", async () => {
   const lines = [...$("cred-body").rows].map((r) => `${r.cells[0].textContent}\tWorker ID: ${r.cells[1].textContent}\tPassword: ${r.cells[2].textContent}`);
-  await navigator.clipboard.writeText(`SurakshaAR login details\n${lines.join("\n")}`);
+  await navigator.clipboard.writeText(`AbhyasAR login details\n${lines.join("\n")}`);
   toast("Copied to clipboard");
 });
 $("cred-print").addEventListener("click", () => window.print());
@@ -791,7 +799,7 @@ function renderCertificates() {
 }
 
 $("export-certs-btn").addEventListener("click", () => {
-  downloadCsv("surakshaar-certificates.csv", ["certified_at", "worker_id", "name", "training", "total_score", "certificate_id", "verification_url", "sync_status"],
+  downloadCsv("abhyasar-certificates.csv", ["certified_at", "worker_id", "name", "training", "total_score", "certificate_id", "verification_url", "sync_status"],
     certificateRows().map(({ w, m, c, issued }) => [issued?.issued_at || c.certifiedAt, w.worker_code, w.display_name, moduleLabel(m), issued?.score ?? c.certifiedTotal,
       issued?.id || "", issued ? `${location.origin}${location.pathname}#/verify/${issued.id}` : "", issued ? "synced" : "awaiting_issue"]));
 });
@@ -815,7 +823,7 @@ async function renderPublicCertificate(certificateId) {
     }
     out.replaceChildren(el("div", { class: "public-status valid" }, el("span", { class: "status-mark" }, "✓"),
       el("h1", {}, "Certificate verified"),
-      el("p", { class: "public-lead" }, "Issued by SurakshaAR."),
+      el("p", { class: "public-lead" }, "Issued by AbhyasAR."),
       el("dl", {},
         el("dt", {}, "Trainee"), el("dd", {}, result.trainee_name),
         el("dt", {}, "Training"), el("dd", {}, moduleLabel(result.module)),
@@ -833,7 +841,7 @@ $("verify-form").addEventListener("submit", async (e) => {
   const out = $("verify-result");
   const cert = parseCertificate($("verify-input").value);
   if (!cert) {
-    out.replaceChildren(el("div", { class: "verify-box bad" }, el("h3", {}, "✗ Not a SurakshaAR certificate"),
+    out.replaceChildren(el("div", { class: "verify-box bad" }, el("h3", {}, "✗ Not a AbhyasAR certificate"),
       el("p", {}, "Check the pasted certificate code.")));
     return;
   }

@@ -127,8 +127,17 @@ public class SyncService : MonoBehaviour
     private IEnumerator SyncLoop()
     {
         var tick = new WaitForSecondsRealtime(1f);
+        NetworkReachability lastReachability = Application.internetReachability;
         while (true)
         {
+            // Offline retries back off up to 5 minutes; sync the moment connectivity returns instead.
+            NetworkReachability reachability = Application.internetReachability;
+            if (lastReachability == NetworkReachability.NotReachable && reachability != NetworkReachability.NotReachable)
+            {
+                RequestSyncSoon();
+            }
+            lastReachability = reachability;
+
             if (Time.realtimeSinceStartup >= nextAttemptAt)
             {
                 yield return SyncAll();

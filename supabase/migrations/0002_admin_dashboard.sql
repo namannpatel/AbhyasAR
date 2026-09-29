@@ -1,4 +1,4 @@
--- SurakshaAR: admin dashboard additions (worker management + admin management).
+-- AbhyasAR: admin dashboard additions (worker management + admin management).
 -- Additive only: no existing table, column or function from 0001_init.sql is changed.
 -- Safe to run more than once (create or replace / if not exists).
 

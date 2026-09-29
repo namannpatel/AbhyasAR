@@ -31,7 +31,7 @@ public struct CertificateInfo
 /// </summary>
 public static class CertificateService
 {
-    public const string VerificationBaseUrl = "https://namannpatel.github.io/SurakshaAR/#/verify/";
+    public const string VerificationBaseUrl = "https://namannpatel.github.io/AbhyasAR/#/verify/";
     private const string Prefix = "AR-CERT";
     private const string PayloadVersion = "v1";
     private const int ExpectedFieldCount = 7; // Prefix, version, name, module, score, timestamp, checksum

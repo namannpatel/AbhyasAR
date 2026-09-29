@@ -82,9 +82,6 @@ crashlytics-build.properties
 # just accumulate as binary bloat from Play Mode testing.
 /[Aa]ssets/[Ss]creenshots/
 
-# Claude Code's own local session/tool state -- not project source.
-.claude/
-
 # Agent skills installed by `npx skills add` -- reinstallable from skills-lock.json.
 .agents/
 

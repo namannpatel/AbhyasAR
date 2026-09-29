@@ -5,7 +5,7 @@ using UnityEngine;
 /// safe to ship: the app can only call the worker_login / submit_attempts RPCs, and every
 /// table is locked behind RLS (see supabase/migrations/0001_init.sql).
 /// </summary>
-[CreateAssetMenu(fileName = "SupabaseConfig", menuName = "SurakshaAR/Supabase Config")]
+[CreateAssetMenu(fileName = "SupabaseConfig", menuName = "AbhyasAR/Supabase Config")]
 public class SupabaseConfig : ScriptableObject
 {
     [Tooltip("e.g. https://abcdefgh.supabase.co")]

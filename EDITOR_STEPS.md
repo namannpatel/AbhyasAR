@@ -17,8 +17,6 @@ the updated `Assets/Scripts/FireExtinguisherController.cs` + new `MenuManager.cs
 they involve scene/prefab binary-ish data that can't be safely hand-edited as raw YAML for changes
 this extensive.
 
-Full design context: see `C:\Users\Lenovo\.claude\plans\merry-noodling-pelican.md`.
-
 ## 1. XR Plug-in Management (5 min)
 `Edit > Project Settings > XR Plug-in Management > Android tab` → check **ARCore**.
 

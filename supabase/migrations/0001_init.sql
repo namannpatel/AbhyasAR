@@ -1,4 +1,4 @@
--- SurakshaAR: worker accounts, device sessions, training progress, admin dashboard access.
+-- AbhyasAR: worker accounts, device sessions, training progress, admin dashboard access.
 -- The Unity app only ever calls worker_login / submit_attempts with the anon key.
 -- The dashboard signs in with Supabase Auth; the admin_* functions check the admins table.
 
