@@ -82,8 +82,13 @@ crashlytics-build.properties
 # just accumulate as binary bloat from Play Mode testing.
 /[Aa]ssets/[Ss]creenshots/
 
-# Agent skills installed by `npx skills add` -- reinstallable from skills-lock.json.
+# Local developer tooling (regenerated or machine-specific) -- not project source.
 .agents/
+.mcp.json
+skills-lock.json
+UIElementsSchema/
+.vscode/
+*.slnx
 
 # Python bytecode from the Tools/ scripts.
 __pycache__/
