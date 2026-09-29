@@ -7,6 +7,20 @@ const configured = cfg.supabaseUrl && !/YOUR-PROJECT/.test(cfg.supabaseUrl) && c
 const db = configured ? supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey) : null;
 
 const $ = (id) => document.getElementById(id);
+const themeToggle = $("theme-toggle");
+function updateThemeToggle() {
+  const dark = document.documentElement.dataset.theme === "dark";
+  themeToggle.textContent = dark ? "Light mode" : "Dark mode";
+  themeToggle.setAttribute("aria-label", `Switch to ${dark ? "light" : "dark"} mode`);
+  themeToggle.setAttribute("aria-pressed", String(dark));
+}
+themeToggle.addEventListener("click", () => {
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("suraksha-theme", next); } catch (_) {}
+  updateThemeToggle();
+});
+updateThemeToggle();
 const state = {
   workers: [],
   attempts: [],
@@ -16,6 +30,7 @@ const state = {
   loadedAt: 0,
   currentWorker: null,
   sort: { key: "last_activity", dir: -1 },
+  quizModule: "fire_safety",
 };
 
 // ------------------------------------------------------------ helpers
@@ -189,26 +204,30 @@ function renderOverview() {
   const range = $("f-range").value;
   const moduleFilter = $("f-module").value;
   const now = Date.now();
-  const since = range === "all" ? -Infinity : now - Number(range) * DAY;
+  const today = new Date(now);
+  const since = range === "all" ? -Infinity
+    : range === "this_month" ? new Date(today.getFullYear(), today.getMonth(), 1).getTime()
+    : range === "this_year" ? new Date(today.getFullYear(), 0, 1).getTime()
+    : now - Number(range) * DAY;
   const inModule = (m) => moduleFilter === "all" || m === moduleFilter;
   const list = state.attempts.filter((a) => inModule(a.module) && Date.parse(a.completed_at) >= since);
   const modules = MODULE_KEYS.filter(inModule);
 
-  const syncedWorkers = new Set(list.map((a) => a.worker_id)).size;
-  $("overview-caption").textContent = `${list.length.toLocaleString()} attempts synced from ${syncedWorkers} worker${syncedWorkers === 1 ? "" : "s"} · ${$("f-range").selectedOptions[0].text.toLowerCase()} · ${$("f-module").selectedOptions[0].text.toLowerCase()}`;
-
   // ---- KPI row
   const activeWorkers = new Set(list.map((a) => a.worker_id)).size;
   const passed = list.filter((a) => a.passed).length;
+  const timedAttempts = list.filter((a) => Number.isFinite(a.elapsed_seconds) && a.elapsed_seconds >= 0);
+  const trainingHours = timedAttempts.reduce((seconds, a) => seconds + a.elapsed_seconds, 0) / 3600;
   let certsEarned = 0;
   for (const c of state.certs.values()) for (const m of modules) if (c[m].certifiedAt && Date.parse(c[m].certifiedAt) >= since) certsEarned++;
-  const quizzes = list.filter((a) => parseScenario(a.module, a.scenario).kind === "quiz").map(quizResult).filter((q) => q.completed && q.pct != null);
+  const quizResults = list.filter((a) => parseScenario(a.module, a.scenario).kind === "quiz").map(quizResult);
+  const quizzes = quizResults.filter((q) => q.completed && q.pct != null);
   const avgQuiz = quizzes.length ? Math.round(quizzes.reduce((n, q) => n + q.pct, 0) / quizzes.length) : null;
   $("overview-tiles").replaceChildren(
     tile("Active workers", activeWorkers, `of ${state.workers.length} workers`),
-    tile("Training attempts", list.length.toLocaleString(), `${passed.toLocaleString()} passed`),
-    tile("Pass rate", pct(passed, list.length), "all attempts"),
-    tile("Certificates earned", certsEarned, `total ≥ ${SCORING.passMark}/100`, true),
+    tile("Training hours", timedAttempts.length ? `${trainingHours.toFixed(2)}h` : "—", timedAttempts.length ? `${timedAttempts.length} timed attempts` : "No timed attempts in this period"),
+    tile("Pass rate", pct(passed, list.length)),
+    tile("Certificates earned", certsEarned, null, true),
     tile("Average quiz score", avgQuiz == null ? "—" : `${avgQuiz}%`, `${quizzes.length} completed quizzes`),
   );
 
@@ -219,7 +238,7 @@ function renderOverview() {
     const first = list.length ? Math.min(...list.map((a) => Date.parse(a.completed_at))) : now;
     const start = range === "all" ? first : since;
     const spanDays = Math.max(1, Math.ceil((now - start) / DAY));
-    const unit = spanDays <= 92 ? "day" : spanDays <= 400 ? "week" : "month";
+    const unit = range === "this_year" ? "month" : spanDays <= 92 ? "day" : spanDays <= 400 ? "week" : "month";
     const buckets = makeBuckets(start, now, unit);
     for (const a of list) {
       const b = buckets.find((bk) => Date.parse(a.completed_at) >= bk.from && Date.parse(a.completed_at) < bk.to);
@@ -231,18 +250,28 @@ function renderOverview() {
     ];
     const c = chartCard({
       title: "Training activity",
-      subtitle: `Attempts per ${unit}`,
       legend: series,
       empty: list.length ? null : "No training attempts in this period.",
       table: { columns: [unit[0].toUpperCase() + unit.slice(1), "Passed", "Not passed", "Total"], rows: buckets.map((b) => [b.tipTitle, b.values.passed, b.values.failed, b.values.passed + b.values.failed]) },
     });
     c.card.classList.add("span-2");
+    const rangeSelect = el("select", { "aria-label": "Training activity period" },
+      [...$("f-range").options].map((option) => el("option", { value: option.value }, option.textContent)));
+    rangeSelect.value = range;
+    rangeSelect.addEventListener("change", () => {
+      $("f-range").value = rangeSelect.value;
+      renderOverview();
+    });
+    const actions = el("div", { class: "viz-actions" }, el("label", { class: "activity-picker" }, "Period", rangeSelect));
+    const toggle = c.card.querySelector(".viz-toggle");
+    if (toggle) actions.append(toggle);
+    c.card.querySelector(".viz-head").append(actions);
     charts.push([c, () => list.length && columnChart(c.body, c.card, c.tooltip, { buckets, series, height: 180, yTitle: "Attempts" })]);
   }
 
   // ---- certification progress
   {
-    const c = chartCard({ title: "Certification progress", subtitle: `Workers whose practice × 40% + quiz × 60% reached ${SCORING.passMark} (all time)` });
+    const c = chartCard({ title: "Certification progress" });
     charts.push([c, () => {
       const total = state.workers.length;
       c.body.replaceChildren(...modules.map((m) => {
@@ -262,14 +291,13 @@ function renderOverview() {
     const parts = partStats(list, modules);
     const c = chartCard({
       title: "Pass rate by training part",
-      subtitle: "Share of attempts passed",
-      empty: parts.length ? null : "No attempts in this period.",
-      table: { columns: ["Training part", "Attempts", "Passed", "Pass rate", "Average score"], rows: parts.map((p) => [p.label, p.n, p.passed, pct(p.passed, p.n), p.avg ?? "—"]) },
+      subtitle: parts.some((p) => p.n > 0) ? null : "No attempts in this period.",
+      table: { columns: ["Training part", "Attempts", "Passed", "Pass rate", "Average score"], rows: parts.map((p) => [p.label, p.n, p.passed, p.n ? pct(p.passed, p.n) : "No attempts", p.avg ?? "—"]) },
     });
-    charts.push([c, () => parts.length && barList(c.body, c.card, c.tooltip, {
+    charts.push([c, () => barList(c.body, c.card, c.tooltip, {
       max: 1,
       rows: parts.map((p) => ({
-        label: p.label, value: p.passed / p.n, valueText: `${pct(p.passed, p.n)} of ${p.n}`,
+        label: p.label, value: p.n ? p.passed / p.n : 0, valueText: p.n ? `${pct(p.passed, p.n)} of ${p.n}` : "No attempts",
         tip: [{ value: p.n, label: "attempts" }, { value: p.passed, label: "passed" }, { value: p.avg ?? "—", label: "average score" }],
       })),
     })]);
@@ -280,7 +308,6 @@ function renderOverview() {
     const steps = missedSteps(list);
     const c = chartCard({
       title: "Where trainees struggle",
-      subtitle: "Fire scenarios: share of attempts where a step was missed",
       empty: steps.length ? null : "No fire scenario attempts in this period.",
       table: { columns: ["Step", "Attempts", "Missed", "Missed %"], rows: steps.map((s) => [s.label, s.n, s.missed, pct(s.missed, s.n)]) },
     });
@@ -291,8 +318,10 @@ function renderOverview() {
     })]);
   }
 
-  // ---- quiz score distribution, one card per quiz
-  for (const m of modules) {
+  // ---- quiz score distribution
+  const quizHost = el("div", { class: "quiz-chart-host" });
+  function renderQuizChart() {
+    const m = modules.includes(state.quizModule) ? state.quizModule : modules[0];
     const qs = list.filter((a) => a.module === m && parseScenario(m, a.scenario).kind === "quiz").map(quizResult);
     const done = qs.filter((q) => q.completed && q.correct != null);
     const closed = qs.filter((q) => !q.completed).length;
@@ -303,14 +332,28 @@ function renderOverview() {
     for (const q of done) buckets[Math.min(total, q.correct)].values[q.correct >= (q.passMark ?? passMark) ? "passed" : "failed"]++;
     const series = [{ key: "passed", label: "Passed", color: "--viz-pass" }, { key: "failed", label: "Not passed", color: "--viz-fail", hatch: true }];
     const c = chartCard({
-      title: `${moduleLabel(m)} quiz scores`,
-      subtitle: `${done.length} completed · ${closed} closed early · pass mark ${passMark}/${total} with full practice, higher below it`,
+      title: "Quiz scores",
+      subtitle: `${done.length} completed · ${closed} closed early`,
       legend: series,
       empty: done.length ? null : "No completed quizzes in this period.",
       table: { columns: ["Correct answers", "Quizzes"], rows: buckets.map((b) => [b.label, b.values.passed + b.values.failed]) },
     });
-    charts.push([c, () => done.length && columnChart(c.body, c.card, c.tooltip, { buckets, series, height: 150, marker: { index: passMark, label: "Pass mark" }, yTitle: "Quizzes" })]);
+    const selector = el("select", { "aria-label": "Quiz score training" }, modules.map((key) =>
+      el("option", { value: key }, moduleLabel(key))));
+    selector.value = m;
+    selector.addEventListener("change", () => {
+      state.quizModule = selector.value;
+      renderQuizChart();
+    });
+    const actions = el("div", { class: "viz-actions" });
+    const toggle = c.card.querySelector(".viz-toggle");
+    if (toggle) actions.append(toggle);
+    actions.append(el("label", { class: "quiz-picker" }, "Training", selector));
+    c.card.querySelector(".viz-head").append(actions);
+    quizHost.replaceChildren(c.card);
+    if (done.length) columnChart(c.body, c.card, c.tooltip, { buckets, series, height: 150, marker: { index: passMark, label: "Pass mark" }, yTitle: "Quizzes" });
   }
+  charts.push([{ card: quizHost }, renderQuizChart]);
 
   $("overview-charts").replaceChildren(...charts.map(([c]) => c.card));
   for (const [, draw] of charts) draw();
@@ -340,7 +383,7 @@ function partStats(list, modules) {
   for (const m of modules) {
     if (m === "fire_safety") {
       for (const s of FIRE_SCENARIOS) order.push({ module: m, key: s.key, label: `Fire · ${s.label}` });
-      for (const cls of ["A", "BC", "ABC"]) order.push({ module: m, key: `class_${cls}`, label: `Fire · Class ${cls} (older app)` });
+      for (const cls of ["A", "BC", "ABC"]) order.push({ module: m, key: `class_${cls}`, label: `Fire · Class ${cls} (older app)`, legacy: true });
       order.push({ module: m, key: "quiz", label: "Fire · Quiz" });
     } else if (m === "machine_training") {
       order.push({ module: m, key: "practice", label: "Machine · Conveyor practice" });
@@ -351,7 +394,7 @@ function partStats(list, modules) {
     const rows = list.filter((a) => a.module === o.module && parseScenario(a.module, a.scenario).key === o.key);
     const scored = rows.filter((a) => a.score != null);
     return { ...o, n: rows.length, passed: rows.filter((a) => a.passed).length, avg: scored.length ? Math.round(scored.reduce((n, a) => n + a.score, 0) / scored.length) : null };
-  }).filter((p) => p.n > 0);
+  }).filter((p) => !p.legacy || p.n > 0);
 }
 
 function missedSteps(list) {
@@ -552,7 +595,7 @@ function moduleCard(m, cert, attempts) {
     el("ul", { class: "steps" }, items.map(([label, st]) => el("li", {}, el("span", {}, label), st))),
     el("p", { class: "module-foot" }, cert.certifiedAt
       ? `Certified ${fmtDate(cert.certifiedAt)} with ${cert.certifiedTotal}/100.`
-      : `Certified when practice × 40% + quiz × 60% reaches ${SCORING.passMark}.`));
+      : `Certificate requires ${SCORING.passMark}/100.`));
 }
 
 /**
@@ -758,7 +801,7 @@ async function renderPublicCertificate(certificateId) {
   const validId = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(certificateId);
   if (!validId) {
     out.replaceChildren(el("div", { class: "public-status invalid" }, el("span", { class: "status-mark" }, "×"),
-      el("h1", {}, "Invalid certificate link"), el("p", {}, "This QR code does not contain a valid SurakshaAR certificate ID.")));
+      el("h1", {}, "Invalid certificate link"), el("p", {}, "The certificate ID is invalid.")));
     return;
   }
   try {
@@ -766,13 +809,13 @@ async function renderPublicCertificate(certificateId) {
     if (!result?.valid) {
       out.replaceChildren(el("div", { class: "public-status pending" }, el("span", { class: "status-mark" }, "…"),
         el("h1", {}, "Certificate not found"),
-        el("p", {}, "It may still be waiting for the trainee's device to sync. Try scanning again when the device is online."),
+        el("p", {}, "The certificate may still be waiting to sync."),
         el("p", { class: "certificate-id" }, `ID ${certificateId}`)));
       return;
     }
     out.replaceChildren(el("div", { class: "public-status valid" }, el("span", { class: "status-mark" }, "✓"),
       el("h1", {}, "Certificate verified"),
-      el("p", { class: "public-lead" }, "Supabase confirms that this certificate was issued by SurakshaAR."),
+      el("p", { class: "public-lead" }, "Issued by SurakshaAR."),
       el("dl", {},
         el("dt", {}, "Trainee"), el("dd", {}, result.trainee_name),
         el("dt", {}, "Training"), el("dd", {}, moduleLabel(result.module)),
@@ -781,7 +824,7 @@ async function renderPublicCertificate(certificateId) {
         el("dt", {}, "Certificate ID"), el("dd", { class: "mono" }, result.certificate_id))));
   } catch (err) {
     out.replaceChildren(el("div", { class: "public-status invalid" }, el("span", { class: "status-mark" }, "!"),
-      el("h1", {}, "Verification unavailable"), el("p", {}, "The certificate service could not be reached. Please try again.")));
+      el("h1", {}, "Verification unavailable"), el("p", {}, "Please try again.")));
   }
 }
 
@@ -791,7 +834,7 @@ $("verify-form").addEventListener("submit", async (e) => {
   const cert = parseCertificate($("verify-input").value);
   if (!cert) {
     out.replaceChildren(el("div", { class: "verify-box bad" }, el("h3", {}, "✗ Not a SurakshaAR certificate"),
-      el("p", {}, "The text doesn't have the certificate format. Make sure you pasted the whole QR text.")));
+      el("p", {}, "Check the pasted certificate code.")));
     return;
   }
   let checksumOk = false;
@@ -803,7 +846,7 @@ $("verify-form").addEventListener("submit", async (e) => {
     el("dt", {}, "Issued"), el("dd", {}, fmtDate(cert.issuedAt)));
   if (!checksumOk) {
     out.replaceChildren(el("div", { class: "verify-box bad" }, el("h3", {}, "✗ Invalid certificate"),
-      el("p", {}, "The checksum doesn't match: this text was altered or wasn't made by the app."), facts));
+      el("p", {}, "The certificate code was altered or is invalid."), facts));
     return;
   }
   await ensureData();
@@ -811,14 +854,13 @@ $("verify-form").addEventListener("submit", async (e) => {
   if (match.exact) {
     const w = match.worker;
     out.replaceChildren(el("div", { class: "verify-box ok" }, el("h3", {}, "✓ Verified against training records"),
-      el("p", {}, "Matches ", el("a", { href: `#/worker/${w.id}` }, `${w.display_name} (${w.worker_code})`),
-        `, whose synced records reach the pass mark of ${SCORING.passMark}/100 (quiz completed ${fmtDate(match.matchedAt)}).`), facts));
+      el("p", {}, "Matches ", el("a", { href: `#/worker/${w.id}` }, `${w.display_name} (${w.worker_code})`), "."), facts));
   } else {
     out.replaceChildren(el("div", { class: "verify-box warn" }, el("h3", {}, "⚠ Not confirmed — no matching training record"),
       el("p", {}, match.nameMatches
-        ? "A worker with this name exists, but their synced records don't show this training passed around this date."
+        ? "No matching passed training was found."
         : "No worker with this name exists in the dashboard."),
-      el("p", { class: "small" }, "The app's certificate checksum is not proof on its own (its key is in the public source code). If the worker trained offline, their results appear here once their device syncs."),
+      el("p", { class: "small" }, "A valid code alone is not proof. Training records may still be waiting to sync."),
       facts));
   }
 });

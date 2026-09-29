@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SurakshaAR Admin</title>
+  <script>try { if (localStorage.getItem("suraksha-theme") === "dark") document.documentElement.dataset.theme = "dark"; } catch (_) {}</script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23FFD20A'/%3E%3Cpath d='M16 5l9 3.4v6.4c0 5.6-3.8 10-9 12.2-5.2-2.2-9-6.6-9-12.2V8.4z' fill='%2311110F'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +35,8 @@
     </div>
   </aside>
 
+  <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Switch to dark mode" aria-pressed="false">Dark mode</button>
+
   <main id="main">
     <!-- Sign in -->
     <section id="view-login" class="view login" hidden>
@@ -45,7 +48,7 @@
       <form id="login-form" class="login-form">
         <p class="kicker">Admin console · restricted</p>
         <h1>Sign in</h1>
-        <p class="muted">Worker logins, synced training results and certificates for SurakshaAR fire and machinery training.</p>
+        <p class="muted">Manage workers, training and certificates.</p>
         <label>Email <input type="email" id="login-email" required autocomplete="username"></label>
         <label>Password <input type="password" id="login-password" required autocomplete="current-password"></label>
         <button type="submit" class="primary">Sign in →</button>
@@ -69,10 +72,6 @@
     <section id="view-overview" class="view" hidden>
       <header class="view-head">
         <div class="headline"><span class="index">01</span><h1>Overview</h1></div>
-        <div class="head-meta">
-          <p class="mono-meta" id="overview-caption"></p>
-          <p class="rule-note">Pass = practice × 40% + quiz × 60% ≥ 80</p>
-        </div>
       </header>
       <div class="filters">
         <label class="inline">Period
@@ -80,6 +79,8 @@
             <option value="7">Last 7 days</option>
             <option value="30" selected>Last 30 days</option>
             <option value="90">Last 90 days</option>
+            <option value="this_month">This month</option>
+            <option value="this_year">This year</option>
             <option value="365">Last 12 months</option>
             <option value="all">All time</option>
           </select>
@@ -101,7 +102,6 @@
       <header class="view-head">
         <div class="headline"><span class="index">02</span><h1>Workers</h1></div>
         <div class="head-meta">
-          <p class="mono-meta">Tap a row for a worker's scores, history and login controls.</p>
           <div class="actions">
             <button class="ghost" id="export-workers-btn">Export CSV</button>
             <button class="primary" id="new-worker-btn">+ Add workers</button>
@@ -182,7 +182,7 @@
           </thead>
           <tbody id="attempts-body"></tbody>
         </table>
-        <p class="empty" id="attempts-empty" hidden>No training attempts synced yet. Results appear after the worker's phone next goes online.</p>
+        <p class="empty" id="attempts-empty" hidden>No synced training attempts yet.</p>
       </div>
     </section>
 
@@ -191,14 +191,13 @@
       <header class="view-head">
         <div class="headline"><span class="index">03</span><h1>Certificates</h1></div>
         <div class="head-meta">
-          <p class="rule-note">Issued when practice × 40% + quiz × 60% reaches 80/100.</p>
           <div class="actions"><button class="ghost" id="export-certs-btn">Export CSV</button></div>
         </div>
       </header>
       <form class="card verify offset" id="verify-form">
         <div class="verify-head">
           <h2>Verify a certificate</h2>
-          <p class="muted">New QR codes open a public verification page automatically. Legacy certificates can still be checked by pasting their <span class="mono">AR-CERT|</span> text here.</p>
+          <p class="muted">Paste a legacy certificate code below.</p>
         </div>
         <div class="verify-row">
           <textarea id="verify-input" rows="2" required placeholder="AR-CERT|v1|…" spellcheck="false"></textarea>
@@ -231,7 +230,6 @@
     <section id="view-admins" class="view" hidden>
       <header class="view-head">
         <div class="headline"><span class="index">04</span><h1>Admins</h1></div>
-        <div class="head-meta"><p class="mono-meta">People who can sign in here, create worker logins and reset passwords.</p></div>
       </header>
       <div class="admins-layout">
         <div class="card table-wrap">
@@ -242,7 +240,7 @@
         </div>
         <form class="card add-admin offset" id="add-admin-form">
           <h2>Grant admin access</h2>
-          <p class="muted">Create their account in Supabase first (<b>Authentication → Users → Add user</b>), then enter the same email.</p>
+          <p class="muted">Enter the email of an existing Supabase user.</p>
           <div class="row">
             <input type="email" id="add-admin-email" required placeholder="name@example.com" aria-label="Admin email">
             <button type="submit" class="primary">Add admin</button>
