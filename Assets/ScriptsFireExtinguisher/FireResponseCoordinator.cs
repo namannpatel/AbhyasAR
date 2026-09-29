@@ -183,7 +183,9 @@ public class FireResponseCoordinator : MonoBehaviour
 
         var result = new FireResponseResult
         {
-            alarmActivated = manualCallPoint == null || manualCallPoint.IsActivated,
+            // Credited only when the call point was actually tapped. A scene with no call point gets
+            // no alarm credit (it used to get the points for free).
+            alarmActivated = manualCallPoint != null && manualCallPoint.IsActivated,
             pinPulled = extinguisherResult.pinPulled,
             aimedAtBase = extinguisherResult.aimedAtBase,
             squeezed = extinguisherResult.squeezed,
@@ -193,8 +195,10 @@ public class FireResponseCoordinator : MonoBehaviour
             forcedFailure = forcedFailure,
             elapsedSeconds = extinguisherResult.elapsedSeconds,
         };
-        result.passed = extinguisherResult.passed && !forcedFailure;
         result.score = ComputeScore(result);
+        // A run that scores at least the pass mark is a pass even if one PASS step was imperfect;
+        // it must never be shown (or stored) as a fail. A forced failure (score 0) still fails.
+        result.passed = !forcedFailure && (extinguisherResult.passed || result.score >= TrainingScoring.PassMark);
 
         RecordProgress(result);
         OnModuleComplete?.Invoke(result);

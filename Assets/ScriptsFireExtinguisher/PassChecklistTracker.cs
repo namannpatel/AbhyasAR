@@ -46,6 +46,10 @@ public class PassChecklistTracker : MonoBehaviour
     public void SetTargetFire(FireSource fire)
     {
         targetFire = fire;
+        if (aim != null)
+        {
+            aim.SweepTarget = fire != null ? fire.transform : null;
+        }
     }
 
     /// <summary>
@@ -115,6 +119,23 @@ public class PassChecklistTracker : MonoBehaviour
         pinPulled = true;
     }
 
+    private void Update()
+    {
+        // "Aim at the base" is earned by actually spraying with the nozzle pointed at the fire's
+        // base, not just by pointing at it: only credited while the lever is squeezed. (Checking
+        // only at the instant of squeeze missed trainees who squeezed first and aimed after.)
+        if (attemptCompleted || aimedAtBase || trigger == null || !trigger.IsSqueezed
+            || aim == null || targetFire == null)
+        {
+            return;
+        }
+
+        if (aim.IsAimedAtFireBase(targetFire.transform))
+        {
+            aimedAtBase = true;
+        }
+    }
+
     private void HandleSqueezeStart()
     {
         squeezed = true;
@@ -176,6 +197,13 @@ public class PassChecklistTracker : MonoBehaviour
         fireFullyOut = false;
         attemptCompleted = false;
         startTime = Time.time;
+
+        // The extinguisher is reused, so put its pin back too: otherwise it stays pulled from the
+        // last scenario -- the lever would work without pulling it and the step could never be earned.
+        if (pin != null)
+        {
+            pin.ResetPin();
+        }
     }
 
     private void CompleteAttempt()

@@ -18,7 +18,7 @@ public class ExtinguisherPickup : MonoBehaviour
     [Tooltip("Local position (relative to the camera) the extinguisher snaps to once held. Keep the handle (and the rest of the model) within the camera's FOV cone on a real device's narrower aspect ratio, not just in the Editor's Game View -- Unity's FOV is vertical, so a taller/narrower phone screen has a noticeably tighter horizontal FOV than a wider test window, and a held-prop offset that looks fine in the Editor can clip on-device. See the -- now corrected -- default here: the previous (0.12, -0.32, 0.55) put the handle's edge ~28 degrees off camera-forward against a real device's ~19-degree horizontal half-FOV budget, clipping it off-screen.")]
     [SerializeField] private Vector3 heldLocalPosition = new Vector3(0.05f, -0.22f, 0.85f);
 
-    [Tooltip("Only used when nozzleReference is unset (see PickUp): local rotation (euler, relative to the camera) the extinguisher snaps to once held. When nozzleReference IS set, only the Y component is used, and it means something different -- see PickUp's doc comment: it spins the already-upright, already-aimed held pose around its own vertical axis (e.g. to bring the nozzle out from behind the body's silhouette) instead of an arbitrary roll.")]
+    [Tooltip("Only used when nozzleReference is unset (see PickUp): local rotation (euler, relative to the camera) the extinguisher snaps to once held. When nozzleReference IS set, only the Y component is used, and it means something different -- see PickUp's doc comment: it spins the already-upright, already-aimed held pose around its own vertical axis to bring the hose and nozzle out from behind the body's silhouette (negative swings it to the left, toward the screen centre); the nozzle pivot is then re-aimed along the camera's forward, so this angle does not change where the spray goes.")]
     [SerializeField] private Vector3 heldLocalEulerAngles = new Vector3(0f, 0f, 0f);
 
     [Tooltip("The nozzle transform (see ExtinguisherAimController) — its rest-pose direction rarely points straight out of the model, so pickup auto-corrects rotation to make it point exactly where the camera looks once held. Optional.")]
@@ -55,9 +55,17 @@ public class ExtinguisherPickup : MonoBehaviour
     private ManualCallPointController requiredCallPoint;
     private FireSource targetFire;
     private ExtinguisherIdentity identity;
+    private Quaternion nozzleRestLocalRotation = Quaternion.identity;
 
     private void Awake()
     {
+        // The nozzle pivot is re-aimed while held (see PickUp) and put back in UndoPickup, so the
+        // authored rotation is remembered here rather than read back from a possibly-modified pivot.
+        if (nozzleReference != null)
+        {
+            nozzleRestLocalRotation = nozzleReference.localRotation;
+        }
+
         bodyCollider = GetComponent<Collider>();
         if (bodyCollider == null)
         {
@@ -173,7 +181,7 @@ public class ExtinguisherPickup : MonoBehaviour
             // nozzleReference is a direct child of this transform, so its localRotation
             // (parent-independent) gives the nozzle's forward direction in THIS transform's
             // own local space regardless of any rotation applied to this transform itself.
-            Vector3 nozzleLocalForward = nozzleReference.localRotation * Vector3.forward;
+            Vector3 nozzleLocalForward = nozzleRestLocalRotation * Vector3.forward;
             Quaternion zAxisToNozzle = Quaternion.FromToRotation(Vector3.forward, nozzleLocalForward);
             Quaternion aimedAndLevel = Quaternion.LookRotation(cam.transform.forward, Vector3.up) * Quaternion.Inverse(zAxisToNozzle);
 
@@ -184,6 +192,13 @@ public class ExtinguisherPickup : MonoBehaviour
             // extinguisher is never held in mathematically perfect alignment; keep it well
             // inside ExtinguisherAimController's aimAngleThreshold.
             transform.rotation = Quaternion.AngleAxis(heldLocalEulerAngles.y, Vector3.up) * aimedAndLevel;
+
+            // The yaw above swings the hose end out to the side so the nozzle (and the smoke that
+            // starts there) is seen beside the cylinder instead of hidden behind it. That must not
+            // change where the spray goes: re-aim the nozzle pivot -- which the spray particles and
+            // ExtinguisherAimController's aim/sweep checks are attached to -- straight along the
+            // camera's forward. Its position stays at the visible hose end.
+            nozzleReference.rotation = Quaternion.LookRotation(cam.transform.forward, Vector3.up);
         }
         else
         {
@@ -212,6 +227,10 @@ public class ExtinguisherPickup : MonoBehaviour
         transform.SetParent(originalParent, worldPositionStays: false);
         transform.localPosition = originalLocalPosition;
         transform.localRotation = originalLocalRotation;
+        if (nozzleReference != null)
+        {
+            nozzleReference.localRotation = nozzleRestLocalRotation;
+        }
         Physics.SyncTransforms();
     }
 }

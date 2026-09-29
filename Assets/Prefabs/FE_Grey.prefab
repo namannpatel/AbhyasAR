@@ -40,7 +40,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1081792519641705062}
-  m_Mesh: {fileID: 4799630050454585619, guid: 636e37c57fa69084aa58705c120978b7, type: 3}
+  m_Mesh: {fileID: 4300000, guid: 437484b3fcb60cf4ab36482f4badf101, type: 2}
 --- !u!23 &6191676865967361272
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -346,6 +346,7 @@ MonoBehaviour:
   OnSweepDetected:
     m_PersistentCalls:
       m_Calls: []
+  sweepAimToleranceScale: 2
 --- !u!1 &3193400199815609651
 GameObject:
   m_ObjectHideFlags: 0
@@ -420,9 +421,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ExtinguisherPickup
   raycastCamera: {fileID: 0}
   heldLocalPosition: {x: 0.05, y: -0.22, z: 0.85}
-  heldLocalEulerAngles: {x: 0, y: 15, z: 0}
+  heldLocalEulerAngles: {x: 0, y: -35, z: 0}
   nozzleReference: {fileID: 1951669869890055806}
   OnPickedUp:
+    m_PersistentCalls:
+      m_Calls: []
+  OnPickupBlockedAlarmNotActive:
+    m_PersistentCalls:
+      m_Calls: []
+  OnPickupBlockedWrongExtinguisher:
     m_PersistentCalls:
       m_Calls: []
   pickupClip: {fileID: 8300000, guid: 5dd0ac01e12c4b640b9137f2132d7c0e, type: 3}
@@ -615,9 +622,9 @@ GameObject:
   m_Component:
   - component: {fileID: 8834422314834290884}
   - component: {fileID: 2134907707693729868}
-  - component: {fileID: 1299151376038687879}
   - component: {fileID: 1062744167646547907}
   - component: {fileID: 4144186479087213278}
+  - component: {fileID: 734870879443858928}
   m_Layer: 0
   m_Name: Pin
   m_TagString: Untagged
@@ -633,9 +640,9 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6499562092817130683}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0.7071068, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0.00083333335, z: 0}
-  m_LocalScale: {x: 0.00033333333, y: 0.00083333335, z: 0.00033333333}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0.0008363436, y: -0.0064833337, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8264948984831495893}
@@ -647,30 +654,7 @@ MeshFilter:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6499562092817130683}
-  m_Mesh: {fileID: 10206, guid: 0000000000000000e000000000000000, type: 0}
---- !u!136 &1299151376038687879
-CapsuleCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6499562092817130683}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 0.8
-  m_Height: 2.6
-  m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Mesh: {fileID: 4300000, guid: c33bc214a88a99349b8b1ce808b1803a, type: 2}
 --- !u!23 &1062744167646547907
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -738,6 +722,27 @@ MonoBehaviour:
   OnPinPulled:
     m_PersistentCalls:
       m_Calls: []
+--- !u!65 &734870879443858928
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6499562092817130683}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 0.0009, y: 0.0009, z: 0.00092986395}
+  m_Center: {x: -0.00040668802, y: 0.0067948187, z: -0.00015622607}
 --- !u!1 &8239584126804603663
 GameObject:
   m_ObjectHideFlags: 0

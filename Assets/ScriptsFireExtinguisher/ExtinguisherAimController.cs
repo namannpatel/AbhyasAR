@@ -22,8 +22,17 @@ public class ExtinguisherAimController : MonoBehaviour
     [Tooltip("Raised once per spray when the sweep arc threshold is exceeded.")]
     public UnityEvent OnSweepDetected;
 
+    [Tooltip("A sweep only counts while the nozzle stays within this multiple of the aim angle of the target fire's base -- sweeping the ceiling or a wall earns nothing.")]
+    [SerializeField] private float sweepAimToleranceScale = 2f;
+
     /// <summary>Set by ExtinguisherTrigger while the lever is held, to gate sweep tracking.</summary>
     public bool IsSpraying { get; set; }
+
+    /// <summary>
+    /// The fire being trained on (set by PassChecklistTracker). Sweep motion is only accumulated
+    /// while the spray is directed at it; with no target set, no sweep is ever credited.
+    /// </summary>
+    public Transform SweepTarget { get; set; }
 
     public Transform AimPoint => transform;
 
@@ -63,6 +72,12 @@ public class ExtinguisherAimController : MonoBehaviour
             return;
         }
 
+        // Spraying elsewhere (ceiling, wall, away from the fire) is not a sweep of the fire.
+        if (SweepTarget == null || !IsAimedAtFireBase(SweepTarget, sweepAimToleranceScale))
+        {
+            return;
+        }
+
         sweepAccumulated += delta;
         if (sweepAccumulated >= sweepArcThreshold)
         {
@@ -77,6 +92,12 @@ public class ExtinguisherAimController : MonoBehaviour
     /// </summary>
     public bool IsAimedAtFireBase(Transform fire)
     {
+        return IsAimedAtFireBase(fire, 1f);
+    }
+
+    /// <summary>Same check with the aim-angle threshold scaled by <paramref name="angleScale"/> (e.g. 2 for a looser sweep test).</summary>
+    public bool IsAimedAtFireBase(Transform fire, float angleScale)
+    {
         if (fire == null)
         {
             return false;
@@ -90,6 +111,6 @@ public class ExtinguisherAimController : MonoBehaviour
         }
 
         float angle = Vector3.Angle(AimPoint.forward, toFire);
-        return angle <= aimAngleThreshold;
+        return angle <= aimAngleThreshold * angleScale;
     }
 }

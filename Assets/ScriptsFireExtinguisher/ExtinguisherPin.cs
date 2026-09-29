@@ -61,6 +61,18 @@ public class ExtinguisherPin : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Puts the pin back for a new attempt. Wall-mounted extinguishers are reused across a whole
+    /// campaign (see ARPlacementController.AdvanceToNextScenario); without this the pin stays pulled
+    /// and hidden after the first scenario, so the lever would work without the pin and the
+    /// "pull the pin" step could never be earned again.
+    /// </summary>
+    public void ResetPin()
+    {
+        IsPulled = false;
+        gameObject.SetActive(true);
+    }
+
     private void Pull()
     {
         IsPulled = true;
