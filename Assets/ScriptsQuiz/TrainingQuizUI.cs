@@ -7,7 +7,7 @@ using Random = UnityEngine.Random;
 
 /// <summary>
 /// Full-screen multiple-choice quiz run as the final step of a training module, with the
-/// question set picked by <see cref="bank"/>: Fire Training (TrainingResultsUI opens it after
+/// question set picked by <see cref="bank"/>: Fire Safety (TrainingResultsUI opens it after
 /// the campaign's last scenario) and Machine Training (MachineTrainingResultsUI opens it once
 /// every conveyor control has been practised). The owner reveals its own final results panel
 /// when the quiz raises OnClosed. This script sits on the full-screen backdrop GameObject,

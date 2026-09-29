@@ -1,6 +1,6 @@
 {
   "app_title": "AbhyasAR",
-  "menu_fire_training": "Fire Training",
+  "menu_fire_training": "Fire Safety",
   "menu_machine_training": "Machine Training",
   "menu_options": "Options",
   "menu_credits": "Credits",
@@ -91,7 +91,7 @@
   "scenario_cabinet": "A fire just started in the electrical cabinet! What should you do?",
   "scenario_furnace": "A fire just started at the gas furnace! What should you do?",
 
-  "module_fire_safety_training": "Fire Safety Training",
+  "module_fire_safety_training": "Fire Safety",
 
   "proximity_warning": "Step back! Don't stand within 4 ft. of the fire.",
 
@@ -172,8 +172,8 @@
   "quiz_status_passed_format": "Fire safety quiz passed ({0}/{1})",
   "quiz_status_not_passed": "Fire safety quiz not passed. No certificate. Retry the last scenario to take the quiz again.",
 
-  "machine_quiz_title": "Machine Safety Quiz",
-  "module_machine_safety_training": "Conveyor Machine Safety Training",
+  "machine_quiz_title": "Machine Training Quiz",
+  "module_machine_safety_training": "Machine Training",
   "quiz_m_q_estop": "What is this red-and-yellow switch on the control box for?",
   "quiz_m_opt_estop_emergency": "Emergency stop: stops the belt instantly, in any mode",
   "quiz_m_opt_estop_start": "Starting the belt",
@@ -253,8 +253,8 @@
   "machine_result_title": "MACHINE TRAINING RESULT",
   "machine_result_pass": "TRAINING PASSED!",
   "machine_result_fail": "NOT PASSED",
-  "machine_quiz_status_passed_format": "Machine safety quiz passed ({0}/{1})",
-  "machine_quiz_status_not_passed": "Machine safety quiz not passed. No certificate. Tap RETRY to repeat the practice and take the quiz again.",
+  "machine_quiz_status_passed_format": "Machine Training quiz passed ({0}/{1})",
+  "machine_quiz_status_not_passed": "Machine Training quiz not passed. No certificate. Tap RETRY to repeat the practice and take the quiz again.",
 
   "conveyor_prompt_place": "Tap the floor to place the conveyor",
   "conveyor_estopped": "E-STOPPED — tap the E-STOP again to reset before continuing",

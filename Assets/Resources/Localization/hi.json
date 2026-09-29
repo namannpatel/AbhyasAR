@@ -1,6 +1,6 @@
 {
   "app_title": "AbhyasAR",
-  "menu_fire_training": "अग्नि प्रशिक्षण",
+  "menu_fire_training": "अग्नि सुरक्षा",
   "menu_machine_training": "मशीन प्रशिक्षण",
   "menu_options": "विकल्प",
   "menu_credits": "क्रेडिट्स",
@@ -91,7 +91,7 @@
   "scenario_cabinet": "इलेक्ट्रिकल कैबिनेट में अभी आग लग गई! आपको क्या करना चाहिए?",
   "scenario_furnace": "गैस भट्टी में अभी आग लग गई! आपको क्या करना चाहिए?",
 
-  "module_fire_safety_training": "अग्नि सुरक्षा प्रशिक्षण",
+  "module_fire_safety_training": "अग्नि सुरक्षा",
 
   "proximity_warning": "पीछे हटें! आग से 4 फीट के भीतर खड़े न हों।",
 
@@ -172,8 +172,8 @@
   "quiz_status_passed_format": "अग्नि सुरक्षा क्विज़ पास ({0}/{1})",
   "quiz_status_not_passed": "आपने अग्नि सुरक्षा क्विज़ पास नहीं किया, इसलिए प्रमाणपत्र नहीं मिलेगा। क्विज़ फिर से देने के लिए अंतिम परिदृश्य दोबारा करें।",
 
-  "machine_quiz_title": "मशीन सुरक्षा क्विज़",
-  "module_machine_safety_training": "कन्वेयर मशीन सुरक्षा प्रशिक्षण",
+  "machine_quiz_title": "मशीन प्रशिक्षण क्विज़",
+  "module_machine_safety_training": "मशीन प्रशिक्षण",
   "quiz_m_q_estop": "कंट्रोल बॉक्स पर यह लाल-पीला स्विच किस लिए है?",
   "quiz_m_opt_estop_emergency": "आपातकालीन रोक: किसी भी मोड में बेल्ट को तुरंत रोकता है",
   "quiz_m_opt_estop_start": "बेल्ट चालू करने के लिए",
@@ -253,8 +253,8 @@
   "machine_result_title": "मशीन प्रशिक्षण परिणाम",
   "machine_result_pass": "प्रशिक्षण पास!",
   "machine_result_fail": "पास नहीं हुए",
-  "machine_quiz_status_passed_format": "मशीन सुरक्षा क्विज़ पास ({0}/{1})",
-  "machine_quiz_status_not_passed": "आपने मशीन सुरक्षा क्विज़ पास नहीं किया, इसलिए प्रमाणपत्र नहीं मिलेगा। अभ्यास दोहराने और क्विज़ फिर से देने के लिए RETRY दबाएँ।",
+  "machine_quiz_status_passed_format": "मशीन प्रशिक्षण क्विज़ पास ({0}/{1})",
+  "machine_quiz_status_not_passed": "आपने मशीन प्रशिक्षण क्विज़ पास नहीं किया, इसलिए प्रमाणपत्र नहीं मिलेगा। अभ्यास दोहराने और क्विज़ फिर से देने के लिए RETRY दबाएँ।",
 
   "conveyor_prompt_place": "कन्वेयर रखने के लिए फ़र्श पर टैप करें",
   "conveyor_estopped": "E-STOP लगा है — आगे बढ़ने से पहले रीसेट करने के लिए E-STOP पर फिर से टैप करें",

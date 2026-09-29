@@ -34,8 +34,8 @@ This is AbhyasAR. It lets your workers *practise* safety, hands-on, in augmented
 
 Every worker has their own login. It works offline after the first sign-in, and the whole app speaks English, Hindi and Santali.
 
-**[3 · Fire training]**
-Let me show you. I open Fire Training, point the phone at the floor, and tap once.
+**[3 · Fire Safety]**
+Let me show you. I open Fire Safety, point the phone at the floor, and tap once.
 
 A fire safety station appears in the room I'm standing in. A call point on the wall, and three different extinguishers.
 
@@ -53,7 +53,7 @@ And the app only gives points for what you actually did. Skip a step, and you do
 **[5 · Scenarios]**
 There are four different fires: a bin, a power outlet, an electrical cabinet, and a gas furnace. On the furnace, if you forget to shut off the gas… it explodes. People remember that.
 
-**[6 · Machine training]**
+**[6 · Machine Training]**
 It's not only fire. Machine Training puts a conveyor belt in front of you, and you practise the controls: start, stop, the emergency stop, reset, manual jog, and speed.
 
 **[7 · Quiz and score]**
@@ -84,7 +84,7 @@ Times are targets. Cut the overlays to the presenter's actual words, not the oth
 | 1 | 0:00–0:12 | ON CAMERA | "Most safety training gets read…" | – | Start on the presenter looking at the extinguisher, then to camera on "forgotten". After "people freeze" hold one beat of silence. |
 | 2 | 0:12–0:20 | ON CAMERA + LOWER THIRD | "This is AbhyasAR." | Logo + lower third: **AbhyasAR – practise safety, don't just read it** | Lower third fades in on "AbhyasAR". |
 | 3 | 0:20–0:34 | PiP | "Every worker has their own login…" | Phone: worker login → main menu → tap **Language**, switch English → हिन्दी → ᱥᱟᱱᱛᱟᱲᱤ | Each language change lands on its word: "English", "Hindi", "Santali". Small text: **Own login · Works offline**. |
-| 4 | 0:34–0:46 | SPLIT | "Let me show you. I open Fire Training…" | Phone: **Fire Training** → floor scan (blue overlay) → tap → station appears | Presenter mimes tapping the phone on "tap once". Cut from split to full screen as the station appears. |
+| 4 | 0:34–0:46 | SPLIT | "Let me show you. I open Fire Safety…" | Phone: **Fire Safety** → floor scan (blue overlay) → tap → station appears | Presenter mimes tapping the phone on "tap once". Cut from split to full screen as the station appears. |
 | 5 | 0:46–1:02 | FULL + VO | "Now a fire starts…" | Screen: fire starts; tap an extinguisher → refused (alarm not raised); tap the call point → siren; tap a wrong extinguisher → refused with warning; pick the right one | Show the refusal banners for 1 second each so they can be read. On-screen text: **1 Alarm · 2 Right extinguisher**. |
 | 6 | 1:02–1:18 | FULL + VO | "Then it's the technique…" | Screen: tap the yellow **pin** (it vanishes) → aim → hold the lever, smoke sprays → sweep → fire shrinks and goes out | One quick text pop per word as it's said: **PULL · AIM · SQUEEZE · SWEEP**. Slow-mo the pin pull. |
 | 7 | 1:18–1:24 | PiP | "And the app only gives points…" | Screen: the **Training Result** panel: green ✓ steps and a red ✗ on one missed step | Pause on the ✗ so the point ("skip a step, no credit") is visible. |
@@ -115,7 +115,7 @@ Times are targets. Cut the overlays to the presenter's actual words, not the oth
 On a real ARCore Android phone with the latest build (`Builds/Android/AbhyasAR.apk`). AR doesn't work in the Unity editor.
 
 1. Login → main menu → language switching (English, Hindi, Santali)
-2. Fire Training: floor scan → tap → station appears
+2. Fire Safety: floor scan → tap → station appears
 3. Alarm blocked → alarm raised → wrong extinguisher refused → right extinguisher
 4. Pin pull (close-up), aim, squeeze with smoke, sweep, fire out
 5. Training Result panel with one ✗ step

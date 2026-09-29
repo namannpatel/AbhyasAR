@@ -15,11 +15,11 @@ export function quizPassMark(practicePct, total) {
 
 export const MODULES = {
   fire_safety: { key: "fire_safety", label: "Fire Safety", practicalLabel: "Fire scenarios" },
-  machine_training: { key: "machine_training", label: "Machinery Training", practicalLabel: "Conveyor practice" },
+  machine_training: { key: "machine_training", label: "Machine Training", practicalLabel: "Conveyor practice" },
 };
 export const MODULE_KEYS = Object.keys(MODULES);
 
-// The four Fire Training scenarios, in the app's campaign order.
+// The four Fire Safety scenarios, in the app's campaign order.
 export const FIRE_SCENARIOS = [
   { key: "trashcan", label: "Trash can fire", fireClass: "A" },
   { key: "outlet", label: "Overloaded outlet", fireClass: "BC" },
@@ -71,7 +71,7 @@ export function quizResult(attempt) {
 
 /**
  * Practice score (0-100) as the app computed it when a quiz ran at time `t`: machine training is
- * its latest practice record, fire training the average of each scenario's latest score. null if
+ * its latest practice record, Fire Safety the average of each scenario's latest score. null if
  * no practical attempt came before `t` (the app only runs the quiz after the practical part).
  */
 function practicePercentAt(module, practicals, t) {
@@ -140,8 +140,8 @@ const CERT_KEY = "ARBT-SmartEducation-2026-CertKey-v1";
 
 // Module names as the app prints them on certificates, in every app language.
 const CERT_MODULE_NAMES = {
-  fire_safety: ["Fire Safety Training", "अग्नि सुरक्षा प्रशिक्षण", "ᱥᱮᱸᱜᱮᱞ ᱥᱟᱦᱟᱛ ᱥᱤᱠᱷᱲᱟ"],
-  machine_training: ["Conveyor Machine Safety Training", "कन्वेयर मशीन सुरक्षा प्रशिक्षण", "ᱠᱚᱱᱵᱷᱮᱭᱟᱨ ᱢᱮᱥᱤᱱ ᱨᱮᱭᱟᱜ ᱦᱚᱨᱦᱚᱭ ᱛᱟᱹᱞᱤᱢ"],
+  fire_safety: ["Fire Safety Training", "अग्नि सुरक्षा प्रशिक्षण", "ᱥᱮᱸᱜᱮᱞ ᱥᱟᱦᱟᱛ ᱥᱤᱠᱷᱲᱟ", "Fire Safety", "अग्नि सुरक्षा", "ᱥᱮᱸᱜᱮᱞ ᱥᱟᱦᱟᱛ"],
+  machine_training: ["Conveyor Machine Safety Training", "कन्वेयर मशीन सुरक्षा प्रशिक्षण", "ᱠᱚᱱᱵᱷᱮᱭᱟᱨ ᱢᱮᱥᱤᱱ ᱨᱮᱭᱟᱜ ᱦᱚᱨᱦᱚᱭ ᱛᱟᱹᱞᱤᱢ", "Machine Training", "मशीन प्रशिक्षण", "ᱢᱮᱥᱤᱱ ᱴᱨᱮᱱᱤᱝ"],
 };
 
 export function parseCertificate(text) {

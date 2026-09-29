@@ -21,7 +21,7 @@ LANGS = {
 
 # narration id -> localization key whose on-screen text it speaks (same key unless noted)
 LINES = [
-    # Fire Training, in the order a trainee hears them
+    # Fire Safety, in the order a trainee hears them
     ("prompt_scan_floor", None), ("prompt_place_wall_content", None), ("prompt_place_fire", None),
     ("prompt_scanning_floor", None), ("prompt_mount_extinguishers", None),
     ("scenario_trashcan", None), ("scenario_outlet", None), ("scenario_cabinet", None), ("scenario_furnace", None),

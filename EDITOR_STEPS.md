@@ -1,4 +1,4 @@
-# Editor-only steps — AR Fire Safety Training Module
+# Editor-only steps — AR Fire Safety Module
 
 **Status: steps 1–7 below are done** (completed via a live `unity-mcp` session — XR Plug-in
 Management, VR-remnant cleanup, `ARRig.prefab`, `Fire_A/ABC/BC.prefab`, and scene wiring for
