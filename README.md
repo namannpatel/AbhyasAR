@@ -67,10 +67,6 @@ All on-screen text lives in `Assets/Resources/Localization/{en,hi,sat}.json`. Mi
 - Certificates and the recorded narration are not translated: the certificate design is English.
 - Performance on low-end phones depends on ARCore support and hardware.
 
-## Authors
-
-Naman Patel ([@namannpatel](https://github.com/namannpatel)) and Harshita Gupta ([@Harshita-code31](https://github.com/Harshita-code31)).
-
 ## License
 
 [MIT](LICENSE) for the project's own code. Third-party models, textures, effects, fonts and audio in `Assets/` have their own licences, so check them before any commercial use.
