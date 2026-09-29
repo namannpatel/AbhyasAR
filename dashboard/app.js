@@ -17,7 +17,7 @@ function updateThemeToggle() {
 themeToggle.addEventListener("click", () => {
   const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
   document.documentElement.dataset.theme = next;
-  try { localStorage.setItem("suraksha-theme", next); } catch (_) {}
+  try { localStorage.setItem("abhyas-theme", next); } catch (_) {}
   updateThemeToggle();
 });
 updateThemeToggle();
