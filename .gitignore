@@ -97,3 +97,7 @@ __pycache__/
 # Supabase CLI local state (linked project ref, cached versions, local branches).
 supabase/.temp/
 supabase/.branches/
+
+# Unity editor scene-recovery backups.
+/[Aa]ssets/_Recovery/
+/[Aa]ssets/_Recovery.meta
