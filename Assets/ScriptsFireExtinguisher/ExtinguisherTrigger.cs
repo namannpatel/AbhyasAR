@@ -47,7 +47,9 @@ public class ExtinguisherTrigger : MonoBehaviour
             return;
         }
 
-        bool held = IsPointerHeldOnHandle();
+        // Once squeezed, keep spraying until the finger is lifted -- drifting off the small lever
+        // collider (or over a HUD button) must not cut the stream.
+        bool held = heldLastFrame ? ArTouchInput.IsPointerDown() : IsPointerHeldOnHandle();
 
         if (held && !heldLastFrame)
         {

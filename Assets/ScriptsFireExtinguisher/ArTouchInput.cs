@@ -39,6 +39,15 @@ public static class ArTouchInput
         return false;
     }
 
+    /// <summary>True while any touch/click is down, wherever it is (including over UI).</summary>
+    public static bool IsPointerDown()
+    {
+        var touch = Touchscreen.current?.primaryTouch;
+        if (touch != null && touch.press.isPressed) return true;
+        var mouse = Mouse.current;
+        return mouse != null && mouse.leftButton.isPressed;
+    }
+
     /// <summary>True on every frame a touch/click is currently down, with its screen position — false while held over UI.</summary>
     public static bool TryGetHeldPosition(out Vector2 screenPos)
     {
