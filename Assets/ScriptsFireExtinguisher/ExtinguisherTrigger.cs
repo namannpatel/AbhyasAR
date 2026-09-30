@@ -63,6 +63,35 @@ public class ExtinguisherTrigger : MonoBehaviour
         heldLastFrame = held;
     }
 
+    private void LateUpdate()
+    {
+        if (spray == null)
+        {
+            return;
+        }
+
+        // The nozzle is aimed along the camera's forward, so seen from the phone the stream would
+        // fly straight away from the viewer and just swell into a blob at the tip. Angle the
+        // visible stream from the nozzle toward the point the player is aiming at, so it reads as
+        // leaving the nozzle. Only this child emitter turns; the nozzle pivot (aim/sweep checks) is untouched.
+        Camera cam = raycastCamera != null ? raycastCamera : Camera.main;
+        if (IsSqueezed && cam != null)
+        {
+            Vector3 focus = cam.transform.position + cam.transform.forward * SprayConvergeDistance;
+            Vector3 toFocus = focus - spray.transform.position;
+            if (toFocus.sqrMagnitude > 0.0001f)
+            {
+                spray.transform.rotation = Quaternion.LookRotation(toFocus.normalized, cam.transform.up);
+            }
+        }
+        else
+        {
+            spray.transform.localRotation = Quaternion.identity;
+        }
+    }
+
+    private const float SprayConvergeDistance = 1.6f;
+
     private void OnDisable()
     {
         // Make sure a held spray doesn't keep emitting if this gets disabled mid-squeeze.
