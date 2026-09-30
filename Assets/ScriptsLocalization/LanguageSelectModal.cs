@@ -40,6 +40,9 @@ public class LanguageSelectModal : MonoBehaviour
         if (modalRoot != null)
         {
             showing = true;
+            // The menu buttons (Logout, SyncStatus, ...) come after this modal in the canvas, so
+            // without this they draw over the card and hide its Close button.
+            modalRoot.transform.SetAsLastSibling();
             modalRoot.SetActive(true);
             showing = false;
         }

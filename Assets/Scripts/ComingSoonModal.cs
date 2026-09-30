@@ -40,6 +40,7 @@ public class ComingSoonModal : MonoBehaviour
         if (modalRoot != null)
         {
             showing = true;
+            modalRoot.transform.SetAsLastSibling(); // draw above the menu buttons that follow it
             modalRoot.SetActive(true);
             showing = false;
         }
