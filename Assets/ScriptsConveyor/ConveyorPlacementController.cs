@@ -133,6 +133,7 @@ public class ConveyorPlacementController : MonoBehaviour
         PlacedConveyor.transform.localPosition = Vector3.zero;
         PlacedConveyor.transform.localRotation = Quaternion.identity;
         PlacedConveyor.transform.localScale = Vector3.one * placedScale;
+        PlacementFacing.FaceCamera(PlacedConveyor.transform, Vector3.right); // its control panel is on +X
 
         MotionController = PlacedConveyor.GetComponentInChildren<ConveyorMotionController>(true);
         placedAtTime = Time.time;

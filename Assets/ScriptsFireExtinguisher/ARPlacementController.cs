@@ -357,6 +357,7 @@ public class ARPlacementController : MonoBehaviour
         PlacedLesson = Instantiate(fireSafetyLessonPrefab, Vector3.zero, Quaternion.identity, anchor);
         PlacedLesson.transform.localPosition = Vector3.zero;
         PlacedLesson.transform.localRotation = Quaternion.identity;
+        PlacementFacing.FaceCamera(PlacedLesson.transform, Vector3.forward);
         LessonController = PlacedLesson.GetComponentInChildren<FireSafetyLessonController>(true);
     }
 
@@ -482,6 +483,7 @@ public class ARPlacementController : MonoBehaviour
         PlacedFire = Instantiate(chosen, Vector3.zero, Quaternion.identity, anchor);
         PlacedFire.transform.localPosition = Vector3.zero;
         PlacedFire.transform.localRotation = Quaternion.identity;
+        PlacementFacing.FaceCamera(PlacedFire.transform, Vector3.forward); // furnace/cabinet fronts are +Z
 
         // The fire safety wall (including the extinguishers) is placed before the fire ever
         // exists (see BuildActiveStages) — wire every already-placed extinguisher's target
