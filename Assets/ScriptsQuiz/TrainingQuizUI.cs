@@ -143,6 +143,7 @@ public class TrainingQuizUI : MonoBehaviour
     {
         if (modalRoot != null)
         {
+            modalRoot.transform.SetAsLastSibling(); // draw above HUD elements that follow it in the canvas
             modalRoot.SetActive(true);
         }
         StartQuiz();

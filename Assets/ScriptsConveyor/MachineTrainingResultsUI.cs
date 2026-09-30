@@ -166,6 +166,7 @@ public class MachineTrainingResultsUI : MonoBehaviour
     {
         if (panelRoot != null)
         {
+            panelRoot.transform.SetAsLastSibling(); // draw above HUD elements that follow it in the canvas
             panelRoot.SetActive(true);
         }
         Refresh();
