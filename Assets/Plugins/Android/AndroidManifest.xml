@@ -10,5 +10,7 @@
     <meta-data android:name="unityplayer.SkipPermissionsDialog" android:value="false" />
   </application>
   <!-- AR Optional: app installs on any device, AR features degrade gracefully if ARCore is unavailable. -->
+  <!-- Gallery saves use MediaStore, which needs no permission on Android 10+; older versions ask at save time. -->
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
   <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 </manifest>

@@ -164,7 +164,9 @@ public class CertificateViewerHost : MonoBehaviour
         saveButton.interactable = false;
         status.text = LocalizationManager.Get("cert_saving");
         yield return null; // let "Saving..." paint before the (synchronous) PNG encode + write
-        bool ok = onSave();
+        bool granted = true;
+        yield return GallerySaver.EnsurePermission(g => granted = g);
+        bool ok = granted && onSave();
         status.text = LocalizationManager.Get(ok ? "cert_saved" : "cert_save_failed");
         saveButton.interactable = true;
         saving = false;
